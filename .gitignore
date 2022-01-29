@@ -1,0 +1,6 @@
+# vim stuff
+*~
+Session.vim
+*.swp
+*.o
+st25ta_read
