@@ -33,7 +33,7 @@ struct st25taCC_t {
 
 struct st25taSF_t {
 	uint8_t size[2];
-	uint8_t gpo;		// ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t gpocfg;		// ST25TA02KB-D, ST25TA02KB-P only
 	uint8_t countercfg; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
 	uint8_t counter[3]; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
 	uint8_t filenum;
@@ -168,6 +168,28 @@ const char *strproduct(uint8_t code) {
 	}
 }
 
+const char *strGPOconfig(uint8_t code) {
+	switch(code >> 4) {
+		case 0: return "Not used - unlocked";
+		case 1: return "Session opened - unlocked";
+		case 2: return "WIP (Writing In Progress) - unlocked";
+		case 3: return "MIP (NDEF Message updating In Progress) - unlocked";
+		case 4: return "Interrupt - unlocked";
+		case 5: return "State Control - unlocked";
+		case 6: return "RF Busy - unlocked";
+		case 7: return "Field Detect - unlocked";
+		case 0+8: return "Not used - locked";
+		case 1+8: return "Session opened - locked";
+		case 2+8: return "WIP (Writing In Progress) - locked";
+		case 3+8: return "MIP (NDEF Message updating In Progress) - locked";
+		case 4+8: return "Interrupt - locked";
+		case 5+8: return "State Control - locked";
+		case 6+8: return "RF Busy - locked";
+		case 7+8: return "Field Detect - locked";
+		default: return "unknown";
+	}
+}
+
 int main(int argc, const char *argv[])
 {
 	struct st25taSF_t sf = { 0 };
@@ -282,6 +304,11 @@ int main(int argc, const char *argv[])
 	printf("  UID:               %02X%02X%02X%02X%02X%02X%02X\n", sf.uid[0], sf.uid[1], sf.uid[2], sf.uid[3], sf.uid[4], sf.uid[5], sf.uid[6]);
 	printf("  Memory Size (-1)   %u\n", (sf.memsize[0] << 8) | sf.memsize[1]);
 	printf("  Product            %s (0x%02X)\n", strproduct(sf.product), sf.product);
+
+	if(sf.product == 0xf2 || sf.product == 0xa2) {
+		printf("\nST25TA02KB-D or ST25TA02KB-P detected\n");
+		printf("  GPO configuration:    %s (0x%02X)\n", strGPOconfig(sf.gpocfg), sf.gpocfg);
+	}
 
 	// Select CC file 0xE103
 	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0)
