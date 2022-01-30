@@ -33,11 +33,9 @@ struct st25taCC_t {
 
 struct st25taSF_t {
 	uint8_t size[2];
-	uint8_t field1;
-	uint8_t field2;
-	uint8_t field3;
-	uint8_t field4;
-	uint8_t field5;
+	uint8_t gpo;		// ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t countercfg; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t counter[3]; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
 	uint8_t filenum;
 	uint8_t uid[7];
 	uint8_t memsize[2];
@@ -232,7 +230,24 @@ int main(int argc, const char *argv[])
 		failquit();
 	}
 
-	// Select App
+	if(nt.nti.nai.abtUid[0] != 0x02) {
+		fprintf(stderr, "Not a STMicroelectronics tag!\n");
+		failquit();
+	}
+
+	// UID[1]!=productID
+	// e4=ST25TA512B  e3=ST25TA02KB  f3=ST25TA02KB-D  a3=ST25TA02KB-P
+	// c4=ST25TA16K  c5=ST25TA16K
+	if(nt.nti.nai.abtUid[1] != 0xc4 && nt.nti.nai.abtUid[1] != 0xc5 &&
+	   nt.nti.nai.abtUid[1] != 0xe4 && nt.nti.nai.abtUid[1] != 0xe3 &&
+	   nt.nti.nai.abtUid[1] != 0xf3 && nt.nti.nai.abtUid[1] != 0xa3) {
+		fprintf(stderr, "Not a ST25TA tag!\n");
+		failquit();
+	}
+
+	// 0xc4 0xc5 0xe5 0xe2 0xf2 0xa2
+
+	// Select App 0xD2760000850101
 	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0)
 		fprintf(stderr, "CardTransmit error!\n");
 
@@ -241,7 +256,7 @@ int main(int argc, const char *argv[])
 		failquit();
 	}
 
-	// Select ST file
+	// Select ST file 0xE101
 	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0)
 		fprintf(stderr, "CardTransmit error!\n");
 
@@ -268,7 +283,7 @@ int main(int argc, const char *argv[])
 	printf("  Memory Size (-1)   %u\n", (sf.memsize[0] << 8) | sf.memsize[1]);
 	printf("  Product            %s (0x%02X)\n", strproduct(sf.product), sf.product);
 
-	// Select CC file
+	// Select CC file 0xE103
 	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0)
 		fprintf(stderr, "CardTransmit error!\n");
 
