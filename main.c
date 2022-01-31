@@ -1,46 +1,20 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
-#include <math.h>
-#include <regex.h>
 #include <signal.h>
-
 #include <nfc/nfc.h>
 
+#include "nfcst25.h"
 #include "color.h"
 
-#define RESPMAXSZ 32
-#define DEBUG      1
+#define RESPMAXSZ 512
+#define DEBUG       1
 
 nfc_device *pnd;
 nfc_context *context;
 
-struct st25taCC_t {
-	uint8_t size[2];
-	uint8_t vmapping;
-	uint8_t nbread[2];
-	uint8_t nbwrite[2];
-	uint8_t tfield;
-	uint8_t vfield;
-	uint8_t id[2];
-	uint8_t maxsize[2];
-	uint8_t readaccess;
-	uint8_t writeaccess;
-};
-
-struct st25taSF_t {
-	uint8_t size[2];
-	uint8_t gpocfg;		// ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t countercfg; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t counter[3]; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t filenum;
-	uint8_t uid[7];
-	uint8_t memsize[2];
-	uint8_t product;
-};
 
 // https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit
 // https://www.st.com/resource/en/datasheet/st25ta64k.pdf
@@ -58,6 +32,32 @@ static void sighandler(int sig)
     exit(EXIT_FAILURE);
 }
 
+int CardTransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapdu, size_t *rapdulen)
+{
+    int res;
+    size_t  szPos;
+
+    printf("=> ");
+
+    for (szPos = 0; szPos < capdulen; szPos++) {
+        printf("%02x ", capdu[szPos]);
+    }
+    printf("\n");
+
+    if ((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1)) < 0) {
+        fprintf(stderr, "nfc_initiator_transceive_bytes error! %s\n", nfc_strerror(pnd));
+        return(-1);
+    } else {
+        *rapdulen = (size_t)res;
+        printf("<= ");
+        for (szPos = 0; szPos < *rapdulen; szPos++) {
+            printf("%02x ", rapdu[szPos]);
+        }
+        printf("\n");
+        return(0);
+    }
+}
+
 // Transmit ADPU from hex string
 int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *rapdulen)
 {
@@ -73,7 +73,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 
 	// linelen >0 & even
 	if(!strnlen(line, 64) || strnlen(line, 64) % 2)
-		return -1;
+		return(-1);
 
 	if(!(capdu = malloc(strnlen(line, 64) / 2))) {
 		fprintf(stderr, "malloc list error: %s\n", strerror(errno));
@@ -94,7 +94,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
         } else {
             // if we have symbols other than spaces and hex
 			free(capdu);
-            return -1;
+            return(-1);
         }
 
         if (strlen(buf) >= 2) {
@@ -109,7 +109,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
     //error when not completed hex bytes
     if(strlen(buf) > 0) {
 		free(capdu);
-		return -1;
+		return(-1);
 	}
 
 	if(DEBUG) {
@@ -120,10 +120,10 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 		printf(RESET "\n");
 	}
 
-    if((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, 500)) < 0) {
+    if((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1)) < 0) {
         fprintf(stderr, "nfc_initiator_transceive_bytes error! %s\n", nfc_strerror(pnd));
 		*rapdulen = 0;
-        return -1;
+        return(-1);
     }
 
 	if(DEBUG) {
@@ -137,7 +137,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 	*rapdulen = (size_t)res;
 
 	free(capdu);
-	return 0;
+	return(0);
 }
 
 static void print_hex(const uint8_t *pbtData, const size_t szBytes)
@@ -158,35 +158,35 @@ void failquit()
 
 const char *strproduct(uint8_t code) {
 	switch(code) {
-		case 0xc4: return "ST25TA64K";
-		case 0xc5: return "ST25TA16K";
-		case 0xe5: return "ST25TA512B";
-		case 0xe2: return "ST25TA02KB";
-		case 0xf2: return "ST25TA02KB-D";
-		case 0xa2: return "ST25TA02KB-P";
-		default: return "unknown";
+		case 0xc4: return("ST25TA64K");
+		case 0xc5: return("ST25TA16K");
+		case 0xe5: return("ST25TA512B");
+		case 0xe2: return("ST25TA02KB");
+		case 0xf2: return("ST25TA02KB-D");
+		case 0xa2: return("ST25TA02KB-P");
+		default: return("unknown");
 	}
 }
 
 const char *strGPOconfig(uint8_t code) {
 	switch(code >> 4) {
-		case 0: return "Not used - unlocked";
-		case 1: return "Session opened - unlocked";
-		case 2: return "WIP (Writing In Progress) - unlocked";
-		case 3: return "MIP (NDEF Message updating In Progress) - unlocked";
-		case 4: return "Interrupt - unlocked";
-		case 5: return "State Control - unlocked";
-		case 6: return "RF Busy - unlocked";
-		case 7: return "Field Detect - unlocked";
-		case 0+8: return "Not used - locked";
-		case 1+8: return "Session opened - locked";
-		case 2+8: return "WIP (Writing In Progress) - locked";
-		case 3+8: return "MIP (NDEF Message updating In Progress) - locked";
-		case 4+8: return "Interrupt - locked";
-		case 5+8: return "State Control - locked";
-		case 6+8: return "RF Busy - locked";
-		case 7+8: return "Field Detect - locked";
-		default: return "unknown";
+		case 0: return("Not used - unlocked");
+		case 1: return("Session opened - unlocked");
+		case 2: return("WIP (Writing In Progress) - unlocked");
+		case 3: return("MIP (NDEF Message updating In Progress) - unlocked");
+		case 4: return("Interrupt - unlocked");
+		case 5: return("State Control - unlocked");
+		case 6: return("RF Busy - unlocked");
+		case 7: return("Field Detect - unlocked");
+		case 0+8: return("Not used - locked");
+		case 1+8: return("Session opened - locked");
+		case 2+8: return("WIP (Writing In Progress) - locked");
+		case 3+8: return("MIP (NDEF Message updating In Progress) - locked");
+		case 4+8: return("Interrupt - locked");
+		case 5+8: return("State Control - locked");
+		case 6+8: return("RF Busy - locked");
+		case 7+8: return("Field Detect - locked");
+		default: return("unknown");
 	}
 }
 
@@ -225,7 +225,7 @@ int main(int argc, const char *argv[])
 	pnd = nfc_open(context, NULL);
 
 	if(pnd == NULL) {
-		printf("ERROR: %s\n", "Unable to open NFC device.");
+		fprintf(stderr, "Unable to open NFC device!\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -242,9 +242,9 @@ int main(int argc, const char *argv[])
 		.nmt = NMT_ISO14443A,	// modulation / coding / protocol initialization
 		.nbr = NBR_106,			// rate
 	};
-
+	printf("Searching for tags: %s @%s\n", str_nfc_modulation_type(NMT_ISO14443A), str_nfc_baud_rate(NBR_106));
 	if(nfc_initiator_select_passive_target(pnd, mod, NULL, 0, &nt) > 0) {
-		printf("ISO14443A tag found. UID: " CYAN);
+		printf("  ISO14443A tag found. UID: " CYAN);
 		print_hex(nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
 		printf(RESET "\n");
 	} else {
@@ -266,8 +266,6 @@ int main(int argc, const char *argv[])
 		fprintf(stderr, "Not a ST25TA tag!\n");
 		failquit();
 	}
-
-	// 0xc4 0xc5 0xe5 0xe2 0xf2 0xa2
 
 	// Select App 0xD2760000850101
 	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0)
@@ -332,18 +330,45 @@ int main(int argc, const char *argv[])
 		memcpy(&cc, resp, 15);
 
 	printf("\nCapability Container file\n");
-	printf("  Len:               %u\n", (cc.size[0] << 8) | cc.size[1]);
-	printf("  Version:           %s\n", cc.vmapping == 0x20 ? "v2.0" : cc.vmapping == 0x10 ? "v1.0" : "??");
-	printf("  max bytes read:    %u\n", (cc.nbread[0] << 8) | cc.nbread[1]);
-	printf("  max bytes write:   %u\n", (cc.nbwrite[0] << 8) | cc.nbwrite[1]);
+	printf("  Len:                      %u\n", (cc.size[0] << 8) | cc.size[1]);
+	printf("  Version:                  %s\n", cc.vmapping == 0x20 ? "v2.0" : cc.vmapping == 0x10 ? "v1.0" : "??");
+	printf("  MLe max R-APDU data size: %u\n", (cc.nbread[0] << 8) | cc.nbread[1]);
+	printf("  MLc max C-APDU data size: %u\n", (cc.nbwrite[0] << 8) | cc.nbwrite[1]);
 	printf("  NDEF file control TLV (Tag/Length/Value):\n");
-	printf("    type of file:    %02x\n", cc.tfield);
-	printf("    L field:         %02x\n", cc.vfield);
-	printf("    file id:         %02x%02x\n", cc.id[0], cc.id[1]);
-	printf("    max ndef size:   %u\n", (cc.maxsize[0] << 8) | cc.maxsize[1]);
+	printf("    type of file:           %02x\n", cc.tfield);
+	printf("    L field:                %02x\n", cc.vfield);
+	printf("    file id:                %02x%02x\n", cc.id[0], cc.id[1]);
+	printf("    max ndef size:          %u\n", (cc.maxsize[0] << 8) | cc.maxsize[1]);
 	printf("    -- access rights --\n");
-	printf("    read:            %02x\n", cc.readaccess);
-	printf("    write:           %02x\n", cc.writeaccess);
+	printf("    read:                   %02x\n", cc.readaccess);
+	printf("    write:                  %02x\n", cc.writeaccess);
+
+	// Select NDEF file 0x0001
+	if(strCardTransmit(pnd, "00 a4 00 0c 02 00 01", resp, &respsz) < 0)
+		fprintf(stderr, "CardTransmit error!\n");
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "Capability Container file select. Bad response !\n");
+		failquit();
+	}
+
+	// Read size
+	if(strCardTransmit(pnd, "00 b0 00 00 02", resp, &respsz) < 0)
+		fprintf(stderr, "CardTransmit error!\n");
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "NDEF file read. Bad response !\n");
+		failquit();
+	}
+
+	uint16_t bytestoread = (resp[0] << 8) | resp[1];
+	uint16_t maxsize = (cc.maxsize[0] << 8) | cc.maxsize[1];
+	uint16_t chunksize = (cc.nbread[0] << 8) | cc.nbread[1];
+	printf("To read: %u/%u (%u)\n", bytestoread, maxsize, chunksize);
+
+
+	// bytestoread
+	//
 
 
 	// Close NFC device
