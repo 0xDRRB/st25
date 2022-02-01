@@ -9,8 +9,9 @@
 #include "nfcst25.h"
 #include "color.h"
 
-#define RESPMAXSZ 512
-#define DEBUG       1
+#define RAPDUMAXSZ 512
+#define CAPDUMAXSZ 512
+#define DEBUG        1
 
 nfc_device *pnd;
 nfc_context *context;
@@ -24,7 +25,7 @@ nfc_context *context;
 static void sighandler(int sig)
 {
     printf("Caught signal %d\n", sig);
-    if (pnd != NULL) {
+    if(pnd != NULL) {
         nfc_abort_command(pnd);
         nfc_close(pnd);
     }
@@ -37,25 +38,30 @@ int CardTransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapd
     int res;
     size_t  szPos;
 
-    printf("=> ");
+	if(DEBUG) {
+		printf(YELLOW "=> ");
+		for (szPos = 0; szPos < capdulen; szPos++) {
+			printf("%02x ", capdu[szPos]);
+		}
+		printf(RESET "\n");
+	}
 
-    for (szPos = 0; szPos < capdulen; szPos++) {
-        printf("%02x ", capdu[szPos]);
-    }
-    printf("\n");
-
-    if ((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1)) < 0) {
+    if((res = nfc_initiator_transceive_bytes(pnd, capdu, capdulen, rapdu, *rapdulen, -1)) < 0) {
         fprintf(stderr, "nfc_initiator_transceive_bytes error! %s\n", nfc_strerror(pnd));
         return(-1);
-    } else {
-        *rapdulen = (size_t)res;
-        printf("<= ");
-        for (szPos = 0; szPos < *rapdulen; szPos++) {
-            printf("%02x ", rapdu[szPos]);
-        }
-        printf("\n");
-        return(0);
     }
+
+	if(DEBUG) {
+		printf(GREEN "<= ");
+		for (szPos = 0; szPos < res; szPos++) {
+			printf("%02x ", rapdu[szPos]);
+		}
+		printf(RESET "\n");
+	}
+
+	*rapdulen = (size_t)res;
+
+	return(0);
 }
 
 // Transmit ADPU from hex string
@@ -65,17 +71,17 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
     size_t szPos;
 	uint8_t *capdu = NULL;
 	size_t capdulen = 0;
-	*rapdulen = RESPMAXSZ;
+	*rapdulen = RAPDUMAXSZ;
 
 	uint32_t temp;
 	int indx = 0;
 	char buf[5] = {0};
 
 	// linelen >0 & even
-	if(!strnlen(line, 64) || strnlen(line, 64) % 2)
+	if(!strlen(line) || strlen(line) > CAPDUMAXSZ*2)
 		return(-1);
 
-	if(!(capdu = malloc(strnlen(line, 64) / 2))) {
+	if(!(capdu = malloc(strlen(line)/2))) {
 		fprintf(stderr, "malloc list error: %s\n", strerror(errno));
 		nfc_close(pnd);
 		nfc_exit(context);
@@ -83,12 +89,12 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 	}
 
     while (line[indx]) {
-        if (line[indx] == '\t' || line[indx] == ' ') {
+        if(line[indx] == '\t' || line[indx] == ' ') {
             indx++;
             continue;
         }
 
-        if (isxdigit(line[indx])) {
+        if(isxdigit(line[indx])) {
             buf[strlen(buf) + 1] = 0x00;
             buf[strlen(buf)] = line[indx];
         } else {
@@ -97,7 +103,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
             return(-1);
         }
 
-        if (strlen(buf) >= 2) {
+        if(strlen(buf) >= 2) {
             sscanf(buf, "%x", &temp);
             capdu[capdulen] = (uint8_t)(temp & 0xff);
             *buf = 0;
@@ -106,8 +112,8 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
         indx++;
     }
 
-    //error when not completed hex bytes
-    if(strlen(buf) > 0) {
+	// error if partial hex bytes
+	if(strlen(buf) > 0) {
 		free(capdu);
 		return(-1);
 	}
@@ -136,7 +142,7 @@ int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 
 	*rapdulen = (size_t)res;
 
-	free(capdu);
+	if(capdu) free(capdu);
 	return(0);
 }
 
@@ -195,7 +201,7 @@ int main(int argc, const char *argv[])
 	struct st25taSF_t sf = { 0 };
 	struct st25taCC_t cc = { 0 };
 
-	uint8_t resp[RESPMAXSZ] = {0};
+	uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz;
 
 	nfc_target nt;
@@ -230,7 +236,7 @@ int main(int argc, const char *argv[])
 	}
 
 	// Set opened NFC device to initiator mode
-	if (nfc_initiator_init(pnd) < 0) {
+	if(nfc_initiator_init(pnd) < 0) {
 		nfc_perror(pnd, "nfc_initiator_init");
 		exit(EXIT_FAILURE);
 	}
@@ -343,33 +349,85 @@ int main(int argc, const char *argv[])
 	printf("    read:                   %02x\n", cc.readaccess);
 	printf("    write:                  %02x\n", cc.writeaccess);
 
-	// Select NDEF file 0x0001
-	if(strCardTransmit(pnd, "00 a4 00 0c 02 00 01", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
 
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Capability Container file select. Bad response !\n");
+	// get max read size
+	uint16_t readsz = (resp[3] << 8) | resp[4];
+
+	// check read access right
+	if(resp[13] != 0) {
+		fprintf(stderr, "NDEF file locked!\n");
 		failquit();
 	}
 
-	// Read size
-	if(strCardTransmit(pnd, "00 b0 00 00 02", resp, &respsz) < 0)
+	// select NDEF with ID from CC
+	uint8_t selndefapdu[7] = { 0x00, 0xa4, 0x00, 0x0c, 0x02, 0x00, 0x00 };
+	selndefapdu[5] = resp[9];
+	selndefapdu[6] = resp[10];
+
+	respsz = RAPDUMAXSZ;
+	if(CardTransmit(pnd, selndefapdu, 7, resp, &respsz) < 0)
 		fprintf(stderr, "CardTransmit error!\n");
 
 	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "NDEF file read. Bad response !\n");
+		fprintf(stderr, "NDEF file select. Bad response !\n");
 		failquit();
 	}
 
-	uint16_t bytestoread = (resp[0] << 8) | resp[1];
-	uint16_t maxsize = (cc.maxsize[0] << 8) | cc.maxsize[1];
-	uint16_t chunksize = (cc.nbread[0] << 8) | cc.nbread[1];
-	printf("To read: %u/%u (%u)\n", bytestoread, maxsize, chunksize);
+	// read NDEF size
+	if(strCardTransmit(pnd, "00b0 0000 02", resp, &respsz) < 0)
+		fprintf(stderr, "CardTransmit error!\n");
 
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "NDEF file select. Bad response !\n");
+		failquit();
+	}
 
-	// bytestoread
-	//
+	// prepare loop read
+	unsigned int bytestoread = (resp[0] << 8) | resp[1];
 
+	uint8_t *ndef;
+	if(!(ndef = malloc(bytestoread))) {
+		fprintf(stderr, "malloc error: %s\n", strerror(errno));
+		failquit();
+	}
+
+	uint16_t pos = 2;
+	uint16_t end = bytestoread+pos;
+	uint8_t rndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
+
+	// loop read
+	while(pos < end-1) {
+		uint8_t nread = pos+readsz < end ? readsz : end-pos;
+
+		rndefapdu[2] = (pos >> 8);
+		rndefapdu[3] = pos & 255;
+		rndefapdu[4] = nread;
+
+		respsz = RAPDUMAXSZ;
+		if(CardTransmit(pnd, rndefapdu, 5, resp, &respsz) < 0)
+			fprintf(stderr, "CardTransmit error!\n");
+
+		if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+			fprintf(stderr, "NDEF file read. Bad response !\n");
+			failquit();
+		}
+
+		memcpy(ndef+pos-2, resp, nread);
+		//  printf("read %u -> %u (%u)\n", pos, pos+nread-1, nread);
+
+		pos=pos+nread;
+	}
+
+	// display
+	for(int i=0; i < bytestoread; i++) {
+		printf("%02x ", ndef[i]);
+		if(!((i+1)%8))
+			printf("\n");
+	}
+	printf("\n");
+
+	if(ndef)
+		free(ndef);
 
 	// Close NFC device
 	nfc_close(pnd);
