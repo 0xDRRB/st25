@@ -1,7 +1,7 @@
 #pragma once
 #include <ctype.h>
 
-struct st25taCC_t {
+typedef struct st25taCC_t {
 	uint8_t size[2];
 	uint8_t vmapping;
 	uint8_t nbread[2];
@@ -12,9 +12,9 @@ struct st25taCC_t {
 	uint8_t maxsize[2];
 	uint8_t readaccess;
 	uint8_t writeaccess;
-};
+} st25taCC;
 
-struct st25taSF_t {
+typedef struct st25taSF_t {
 	uint8_t size[2];
 	uint8_t gpocfg;		// ST25TA02KB-D, ST25TA02KB-P only
 	uint8_t countercfg; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
@@ -23,5 +23,5 @@ struct st25taSF_t {
 	uint8_t uid[7];
 	uint8_t memsize[2];
 	uint8_t product;
-};
+} st25taSF;
 

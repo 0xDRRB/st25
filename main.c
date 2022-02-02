@@ -11,7 +11,7 @@
 
 #define RAPDUMAXSZ 512
 #define CAPDUMAXSZ 512
-#define DEBUG        1
+#define DEBUG        0
 
 nfc_device *pnd;
 nfc_context *context;
@@ -196,15 +196,243 @@ const char *strGPOconfig(uint8_t code) {
 	}
 }
 
-int main(int argc, const char *argv[])
-{
-	struct st25taSF_t sf = { 0 };
-	struct st25taCC_t cc = { 0 };
+void printCC(st25taCC *cc) {
+	printf("Capability Container file\n");
+	printf("  Len:                      %u\n", (cc->size[0] << 8) | cc->size[1]);
+	printf("  Version:                  %s\n", cc->vmapping == 0x20 ? "v2.0" : cc->vmapping == 0x10 ? "v1.0" : "??");
+	printf("  MLe max R-APDU data size: %u\n", (cc->nbread[0] << 8) | cc->nbread[1]);
+	printf("  MLc max C-APDU data size: %u\n", (cc->nbwrite[0] << 8) | cc->nbwrite[1]);
+	printf("  NDEF file control TLV (Tag/Length/Value):\n");
+	printf("    type of file:           %02x\n", cc->tfield);
+	printf("    L field:                %02x\n", cc->vfield);
+	printf("    file id:                %02x%02x\n", cc->id[0], cc->id[1]);
+	printf("    max ndef size:          %u\n", (cc->maxsize[0] << 8) | cc->maxsize[1]);
+	printf("    -- access rights --\n");
+	printf("    read:                   %02x (%s)\n", cc->readaccess, cc->readaccess == 0x00 ? "Unlocked" : cc->readaccess == 0x80 ? "Locked" : cc->readaccess == 0xfe ? "PerlLocked" : "?????");
+	printf("    write:                  %02x (%s)\n", cc->writeaccess, cc->writeaccess == 0x00 ? "Unlocked" : cc->writeaccess == 0x80 ? "Locked" : cc->writeaccess == 0xff ? "PerlLocked" : "?????");
+}
 
+void printSF(st25taSF *sf) {
+	printf("ST System file\n");
+	printf("  Len:               %u\n", (sf->size[0] << 8) | sf->size[1]);
+	printf("  UID:               %02X%02X%02X%02X%02X%02X%02X\n", sf->uid[0], sf->uid[1], sf->uid[2], sf->uid[3], sf->uid[4], sf->uid[5], sf->uid[6]);
+	printf("  Memory Size (-1):  %u\n", (sf->memsize[0] << 8) | sf->memsize[1]);
+	printf("  Product:           %s (0x%02X)\n", strproduct(sf->product), sf->product);
+
+	if(sf->product == 0xf2 || sf->product == 0xa2) {
+		printf("\nST25TA02KB-D or ST25TA02KB-P detected\n");
+		printf("  GPO configuration:    %s (0x%02X)\n", strGPOconfig(sf->gpocfg), sf->gpocfg);
+	}
+}
+
+int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz;
 
+	if(!cc) return(-1);
+
+	// Select App 0xD2760000850101
+	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "Application select. Bad response !\n");
+		return(-1);
+	}
+
+	// Select CC file 0xE103
+	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "Capability Container file select. Bad response !\n");
+		return(-1);
+	}
+
+	// Read
+	if(strCardTransmit(pnd, "00 b0 00 00 0f", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "Capability Container file read. Bad response !\n");
+		return(-1);
+	}
+
+	if(respsz == 17 && resp[0] == 0 && resp[1] == 0x0f)
+		memcpy(cc, resp, 15);
+
+	return(0);
+}
+
+int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
+	uint8_t resp[RAPDUMAXSZ] = {0};
+	size_t respsz;
+
+	if(!sf) return(-1);
+
+	// Select App 0xD2760000850101
+	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "Application select. Bad response !\n");
+		return(-1);
+	}
+
+	// Select ST file 0xE101
+	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "ST System file select. Bad response !\n");
+		return(-1);
+	}
+
+	// Read
+	if(strCardTransmit(pnd, "00 b0 00 00 12", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "ST System file read. Bad response !\n");
+		return(-1);
+	}
+
+	if(respsz == 20 && resp[0] == 0 && resp[1] == 0x12)
+		memcpy(sf, resp, 18);
+
+	return(0);
+}
+
+int st25tagetndef(nfc_device *pnd, uint8_t **data) {
+	int len = 0;
+    uint8_t resp[RAPDUMAXSZ] = {0};
+	size_t respsz = RAPDUMAXSZ;
+	st25taCC tmpcc;
+	uint16_t readsz;
+	uint8_t selndefapdu[7] = { 0x00, 0xa4, 0x00, 0x0c, 0x02, 0x00, 0x00 };
+	unsigned int bytestoread;
+	uint16_t pos;
+	uint16_t end;
+	uint8_t rndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
+	uint8_t *p;
+
+	if(st25tagetCC(pnd, &tmpcc) != 0)
+		return(-1);
+
+	// get read max size
+	readsz = (tmpcc.nbread[0] << 8) | tmpcc.nbread[1];
+
+	// check read access right
+	if(tmpcc.readaccess != 0) {
+		fprintf(stderr, "NDEF file locked!\n");
+		return(-1);
+	}
+
+	// select NDEF with ID from CC
+	selndefapdu[5] = tmpcc.id[0];
+	selndefapdu[6] = tmpcc.id[1];
+
+	if(CardTransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "NDEF file select. Bad response !\n");
+		return(-1);
+	}
+
+	// read NDEF size
+	if(strCardTransmit(pnd, "00b0 0000 02", resp, &respsz) < 0) {
+		fprintf(stderr, "CardTransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+		fprintf(stderr, "NDEF file select. Bad response !\n");
+		return(-1);
+	}
+
+	// prepare loop read
+	bytestoread = (resp[0] << 8) | resp[1];
+
+	if(!(p = malloc(bytestoread))) {
+		fprintf(stderr, "malloc error: %s\n", strerror(errno));
+		return(-1);
+	}
+
+	pos = 2;
+	end = bytestoread+pos;
+
+	// loop read
+	while(pos < end-1) {
+		uint8_t nread = pos+readsz < end ? readsz : end-pos;
+
+		rndefapdu[2] = (pos >> 8);
+		rndefapdu[3] = pos & 255;
+		rndefapdu[4] = nread;
+
+		respsz = RAPDUMAXSZ;
+		if(CardTransmit(pnd, rndefapdu, 5, resp, &respsz) < 0) {
+			fprintf(stderr, "CardTransmit error!\n");
+			return(-1);
+		}
+
+		if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
+			fprintf(stderr, "NDEF file read. Bad response !\n");
+			return(-1);
+		}
+
+		memcpy(p+pos-2, resp, nread);
+		pos=pos+nread;
+	}
+
+	len = bytestoread;
+	*data = p;
+	return(len);
+}
+
+int st25tacheck(nfc_target *nt) {
+	if(nt->nti.nai.abtUid[0] != 0x02) {
+		return(0);
+	}
+
+	// UID[1]!=productID
+	// e4=ST25TA512B  e3=ST25TA02KB  f3=ST25TA02KB-D  a3=ST25TA02KB-P
+	// c4=ST25TA16K  c5=ST25TA16K
+	if(nt->nti.nai.abtUid[1] != 0xc4 && nt->nti.nai.abtUid[1] != 0xc5 &&
+	   nt->nti.nai.abtUid[1] != 0xe4 && nt->nti.nai.abtUid[1] != 0xe3 &&
+	   nt->nti.nai.abtUid[1] != 0xf3 && nt->nti.nai.abtUid[1] != 0xa3) {
+		return(0);
+	}
+
+	return(1);
+}
+
+
+int main(int argc, const char *argv[])
+{
 	nfc_target nt;
+	st25taSF sf = { 0 };
+	st25taCC cc = { 0 };
+	uint8_t *ndef = NULL;
+	size_t ndeflen = 0;
+	const nfc_modulation mod = {
+		.nmt = NMT_ISO14443A,
+		.nbr = NBR_106
+	};
 
 	// Initialize libnfc and set the nfc_context
 	nfc_init(&context);
@@ -243,14 +471,9 @@ int main(int argc, const char *argv[])
 
 	printf("NFC reader: %s opened\n", nfc_device_get_name(pnd));
 
-	// Poll for a ISO14443A tag
-	const nfc_modulation mod = {
-		.nmt = NMT_ISO14443A,	// modulation / coding / protocol initialization
-		.nbr = NBR_106,			// rate
-	};
-	printf("Searching for tags: %s @%s\n", str_nfc_modulation_type(NMT_ISO14443A), str_nfc_baud_rate(NBR_106));
 	if(nfc_initiator_select_passive_target(pnd, mod, NULL, 0, &nt) > 0) {
-		printf("  ISO14443A tag found. UID: " CYAN);
+		printf("%s (%s) tag found. UID: " CYAN,
+				str_nfc_modulation_type(mod.nmt), str_nfc_baud_rate(mod.nbr));
 		print_hex(nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
 		printf(RESET "\n");
 	} else {
@@ -258,173 +481,42 @@ int main(int argc, const char *argv[])
 		failquit();
 	}
 
-	if(nt.nti.nai.abtUid[0] != 0x02) {
-		fprintf(stderr, "Not a STMicroelectronics tag!\n");
+	if(st25tacheck(&nt) == 0) {
+		fprintf(stderr, "Not a ST25TA* tag !\n");
 		failquit();
 	}
 
-	// UID[1]!=productID
-	// e4=ST25TA512B  e3=ST25TA02KB  f3=ST25TA02KB-D  a3=ST25TA02KB-P
-	// c4=ST25TA16K  c5=ST25TA16K
-	if(nt.nti.nai.abtUid[1] != 0xc4 && nt.nti.nai.abtUid[1] != 0xc5 &&
-	   nt.nti.nai.abtUid[1] != 0xe4 && nt.nti.nai.abtUid[1] != 0xe3 &&
-	   nt.nti.nai.abtUid[1] != 0xf3 && nt.nti.nai.abtUid[1] != 0xa3) {
-		fprintf(stderr, "Not a ST25TA tag!\n");
+	if(st25tagetSF(pnd, &sf) != 0) {
+		fprintf(stderr, "Unable to get ST System file!\n");
 		failquit();
 	}
+	printf("\n");
+	printSF(&sf);
 
-	// Select App 0xD2760000850101
-	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Application select. Bad response !\n");
+	if(st25tagetCC(pnd, &cc) != 0) {
+		fprintf(stderr, "unable to get st system file!\n");
 		failquit();
 	}
+	printf("\n");
+	printCC(&cc);
 
-	// Select ST file 0xE101
-	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "ST System file select. Bad response !\n");
+	if((ndeflen=st25tagetndef(pnd, &ndef)) < 0 ) {
+		fprintf(stderr, "Unable to read NDEF file read !\n");
 		failquit();
-	}
-
-	// Read
-	if(strCardTransmit(pnd, "00 b0 00 00 12", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "ST System file read. Bad response !\n");
-		failquit();
-	}
-
-	if(respsz == 20 && resp[0] == 0 && resp[1] == 0x12)
-		memcpy(&sf, resp, 18);
-
-	printf("\nST System file\n");
-	printf("  Len:               %u\n", (sf.size[0] << 8) | sf.size[1]);
-	printf("  UID:               %02X%02X%02X%02X%02X%02X%02X\n", sf.uid[0], sf.uid[1], sf.uid[2], sf.uid[3], sf.uid[4], sf.uid[5], sf.uid[6]);
-	printf("  Memory Size (-1)   %u\n", (sf.memsize[0] << 8) | sf.memsize[1]);
-	printf("  Product            %s (0x%02X)\n", strproduct(sf.product), sf.product);
-
-	if(sf.product == 0xf2 || sf.product == 0xa2) {
-		printf("\nST25TA02KB-D or ST25TA02KB-P detected\n");
-		printf("  GPO configuration:    %s (0x%02X)\n", strGPOconfig(sf.gpocfg), sf.gpocfg);
-	}
-
-	// Select CC file 0xE103
-	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Capability Container file select. Bad response !\n");
-		failquit();
-	}
-
-	// Read
-	if(strCardTransmit(pnd, "00 b0 00 00 0f", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Capability Container file read. Bad response !\n");
-		failquit();
-	}
-
-	if(respsz == 17 && resp[0] == 0 && resp[1] == 0x0f)
-		memcpy(&cc, resp, 15);
-
-	printf("\nCapability Container file\n");
-	printf("  Len:                      %u\n", (cc.size[0] << 8) | cc.size[1]);
-	printf("  Version:                  %s\n", cc.vmapping == 0x20 ? "v2.0" : cc.vmapping == 0x10 ? "v1.0" : "??");
-	printf("  MLe max R-APDU data size: %u\n", (cc.nbread[0] << 8) | cc.nbread[1]);
-	printf("  MLc max C-APDU data size: %u\n", (cc.nbwrite[0] << 8) | cc.nbwrite[1]);
-	printf("  NDEF file control TLV (Tag/Length/Value):\n");
-	printf("    type of file:           %02x\n", cc.tfield);
-	printf("    L field:                %02x\n", cc.vfield);
-	printf("    file id:                %02x%02x\n", cc.id[0], cc.id[1]);
-	printf("    max ndef size:          %u\n", (cc.maxsize[0] << 8) | cc.maxsize[1]);
-	printf("    -- access rights --\n");
-	printf("    read:                   %02x\n", cc.readaccess);
-	printf("    write:                  %02x\n", cc.writeaccess);
-
-
-	// get max read size
-	uint16_t readsz = (resp[3] << 8) | resp[4];
-
-	// check read access right
-	if(resp[13] != 0) {
-		fprintf(stderr, "NDEF file locked!\n");
-		failquit();
-	}
-
-	// select NDEF with ID from CC
-	uint8_t selndefapdu[7] = { 0x00, 0xa4, 0x00, 0x0c, 0x02, 0x00, 0x00 };
-	selndefapdu[5] = resp[9];
-	selndefapdu[6] = resp[10];
-
-	respsz = RAPDUMAXSZ;
-	if(CardTransmit(pnd, selndefapdu, 7, resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "NDEF file select. Bad response !\n");
-		failquit();
-	}
-
-	// read NDEF size
-	if(strCardTransmit(pnd, "00b0 0000 02", resp, &respsz) < 0)
-		fprintf(stderr, "CardTransmit error!\n");
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "NDEF file select. Bad response !\n");
-		failquit();
-	}
-
-	// prepare loop read
-	unsigned int bytestoread = (resp[0] << 8) | resp[1];
-
-	uint8_t *ndef;
-	if(!(ndef = malloc(bytestoread))) {
-		fprintf(stderr, "malloc error: %s\n", strerror(errno));
-		failquit();
-	}
-
-	uint16_t pos = 2;
-	uint16_t end = bytestoread+pos;
-	uint8_t rndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
-
-	// loop read
-	while(pos < end-1) {
-		uint8_t nread = pos+readsz < end ? readsz : end-pos;
-
-		rndefapdu[2] = (pos >> 8);
-		rndefapdu[3] = pos & 255;
-		rndefapdu[4] = nread;
-
-		respsz = RAPDUMAXSZ;
-		if(CardTransmit(pnd, rndefapdu, 5, resp, &respsz) < 0)
-			fprintf(stderr, "CardTransmit error!\n");
-
-		if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-			fprintf(stderr, "NDEF file read. Bad response !\n");
-			failquit();
-		}
-
-		memcpy(ndef+pos-2, resp, nread);
-		//  printf("read %u -> %u (%u)\n", pos, pos+nread-1, nread);
-
-		pos=pos+nread;
 	}
 
 	// display
-	for(int i=0; i < bytestoread; i++) {
-		printf("%02x ", ndef[i]);
-		if(!((i+1)%8))
-			printf("\n");
+	printf("\nNDEF data:\n");
+	if(ndeflen > 0) {
+		for(int i=0; i < ndeflen; i++) {
+			printf("%02x ", ndef[i]);
+			if(!((i+1)%16))
+				printf("\n");
+		}
+		printf("\n");
+	} else {
+		printf("No NDEF data\n");
 	}
-	printf("\n");
 
 	if(ndef)
 		free(ndef);
