@@ -33,7 +33,7 @@ static void sighandler(int sig)
     exit(EXIT_FAILURE);
 }
 
-int CardTransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapdu, size_t *rapdulen)
+int cardtransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapdu, size_t *rapdulen)
 {
     int res;
     size_t  szPos;
@@ -65,7 +65,7 @@ int CardTransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapd
 }
 
 // Transmit ADPU from hex string
-int strCardTransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *rapdulen)
+int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *rapdulen)
 {
     int res;
     size_t szPos;
@@ -232,8 +232,8 @@ int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	if(!cc) return(-1);
 
 	// Select App 0xD2760000850101
-	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -243,8 +243,8 @@ int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	}
 
 	// Select CC file 0xE103
-	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -254,8 +254,8 @@ int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	}
 
 	// Read
-	if(strCardTransmit(pnd, "00 b0 00 00 0f", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 b0 00 00 0f", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -277,8 +277,8 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	if(!sf) return(-1);
 
 	// Select App 0xD2760000850101
-	if(strCardTransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -288,8 +288,8 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	}
 
 	// Select ST file 0xE101
-	if(strCardTransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -299,8 +299,8 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	}
 
 	// Read
-	if(strCardTransmit(pnd, "00 b0 00 00 12", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00 b0 00 00 12", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -325,7 +325,7 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 	unsigned int bytestoread;
 	uint16_t pos;
 	uint16_t end;
-	uint8_t rndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
+	uint8_t readndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
 	uint8_t *p;
 
 	if(st25tagetCC(pnd, &tmpcc) != 0)
@@ -344,8 +344,8 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 	selndefapdu[5] = tmpcc.id[0];
 	selndefapdu[6] = tmpcc.id[1];
 
-	if(CardTransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(cardtransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -355,8 +355,8 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 	}
 
 	// read NDEF size
-	if(strCardTransmit(pnd, "00b0 0000 02", resp, &respsz) < 0) {
-		fprintf(stderr, "CardTransmit error!\n");
+	if(strcardtransmit(pnd, "00b0 0000 02", resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
@@ -380,13 +380,13 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 	while(pos < end-1) {
 		uint8_t nread = pos+readsz < end ? readsz : end-pos;
 
-		rndefapdu[2] = (pos >> 8);
-		rndefapdu[3] = pos & 255;
-		rndefapdu[4] = nread;
+		readndefapdu[2] = (pos >> 8);
+		readndefapdu[3] = pos & 255;
+		readndefapdu[4] = nread;
 
 		respsz = RAPDUMAXSZ;
-		if(CardTransmit(pnd, rndefapdu, 5, resp, &respsz) < 0) {
-			fprintf(stderr, "CardTransmit error!\n");
+		if(cardtransmit(pnd, readndefapdu, 5, resp, &respsz) < 0) {
+			fprintf(stderr, "cardtransmit error!\n");
 			return(-1);
 		}
 
