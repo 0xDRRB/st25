@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <signal.h>
+#include <unistd.h>
 #include <nfc/nfc.h>
 
 #include "nfcst25.h"
@@ -15,7 +16,7 @@
 
 nfc_device *pnd;
 nfc_context *context;
-
+int optverb = 0;
 
 // https://en.wikipedia.org/wiki/Smart_card_application_protocol_data_unit
 // https://www.st.com/resource/en/datasheet/st25ta64k.pdf
@@ -36,9 +37,10 @@ static void sighandler(int sig)
 int cardtransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapdu, size_t *rapdulen)
 {
     int res;
+	uint16_t status;
     size_t  szPos;
 
-	if(DEBUG) {
+	if(DEBUG || optverb) {
 		printf(YELLOW "=> ");
 		for (szPos = 0; szPos < capdulen; szPos++) {
 			printf("%02x ", capdu[szPos]);
@@ -51,12 +53,23 @@ int cardtransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapd
         return(-1);
     }
 
-	if(DEBUG) {
+	if(DEBUG || optverb) {
 		printf(GREEN "<= ");
 		for (szPos = 0; szPos < res; szPos++) {
 			printf("%02x ", rapdu[szPos]);
 		}
 		printf(RESET "\n");
+	}
+
+	if(res < 2) {
+		fprintf(stderr, "Bad response !\n");
+		return(-1);
+	}
+
+	status = (rapdu[res-2] << 8) | rapdu[res-1];	
+	if(status != S_SUCCESS) {
+		fprintf(stderr, "Bad response ! 0x%04x:%s\n", status, strst25tastatus(status));
+		return(-1);
 	}
 
 	*rapdulen = (size_t)res;
@@ -76,6 +89,8 @@ int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 	uint32_t temp;
 	int indx = 0;
 	char buf[5] = {0};
+
+	uint16_t status;
 
 	// linelen >0 & even
 	if(!strlen(line) || strlen(line) > CAPDUMAXSZ*2)
@@ -118,7 +133,7 @@ int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 		return(-1);
 	}
 
-	if(DEBUG) {
+	if(DEBUG || optverb) {
 		printf(YELLOW "=> " );
 		for (szPos = 0; szPos < capdulen; szPos++) {
 			printf("%02x ", capdu[szPos]);
@@ -132,7 +147,9 @@ int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
         return(-1);
     }
 
-	if(DEBUG) {
+	if(capdu) free(capdu);
+
+	if(DEBUG || optverb) {
 		printf(GREEN "<= ");
 		for (szPos = 0; szPos < res; szPos++) {
 			printf("%02x ", rapdu[szPos]);
@@ -140,9 +157,14 @@ int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 		printf(RESET "\n");
 	}
 
+	status = (rapdu[res-2] << 8) | rapdu[res-1];	
+	if(status != S_SUCCESS) {
+		fprintf(stderr, "Bad response ! 0x%04x:%s\n", status, strst25tastatus(status));
+		return(-1);
+	}
+
 	*rapdulen = (size_t)res;
 
-	if(capdu) free(capdu);
 	return(0);
 }
 
@@ -160,6 +182,51 @@ void failquit()
 	if(pnd) nfc_close(pnd);
 	if(context) nfc_exit(context);
 	exit(EXIT_SUCCESS);
+}
+
+const char *strst25tastatus(uint16_t code) {
+	switch(code) {
+		case S_SUCCESS:
+			return("Command completed successfully");
+		case E_OVERFLOW_E:
+			return("File overflow (Le error)");
+		case E_EOF:
+			return("End of file or record reached before reading Le bytes");
+		case E_PASSREQ:
+			return("Password is required");
+		case E_BADPASS0:
+			return("Password is incorrect, 0 further retries allowed");
+		case E_BADPASS1:
+			return("Password is incorrect, 1 further retries allowed");
+		case E_BADPASS3:
+			return("Password is incorrect, 2 further retries allowed");
+		case E_UPDATEERR:
+			return("Unsuccessful updating");
+		case E_WRONGLEN:
+			return("Wrong length");
+		case E_CMDINCOMP:
+			return("Command is incompatible with the file structure");
+		case E_NOTSEC:
+			return("Security status not satisfied");
+		case E_DATAREF:
+			return("Reference data not usable");
+		case E_BABCOND:
+			return("The conditions of use are not satisfied");
+		case E_INCPARAM:
+			return("Incorrect parameters Le/Lc or CC file or System file selected");
+		case E_NOTFOUND:
+			return("File or application not found");
+		case E_OVERFLOW_C:
+			return("File overflow (Lc error)");
+		case E_BADP1P2:
+			return("Incorrect P1 or P2 values");
+		case E_NOINS:
+			return("INS field not supported");
+		case E_CLASS:
+			return("Class not supported");
+		default:
+			return("Unknown error");
+	}
 }
 
 const char *strproduct(uint8_t code) {
@@ -232,35 +299,20 @@ int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	if(!cc) return(-1);
 
 	// Select App 0xD2760000850101
-	if(strcardtransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00a4 0400 07 d2760000850101 00", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Application select. Bad response !\n");
 		return(-1);
 	}
 
 	// Select CC file 0xE103
-	if(strcardtransmit(pnd, "00 a4 00 0c 02 e1 03", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00a4 000c 02 e103", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Capability Container file select. Bad response !\n");
 		return(-1);
 	}
 
 	// Read
-	if(strcardtransmit(pnd, "00 b0 00 00 0f", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00b0 0000 0f", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Capability Container file read. Bad response !\n");
 		return(-1);
 	}
 
@@ -277,35 +329,20 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	if(!sf) return(-1);
 
 	// Select App 0xD2760000850101
-	if(strcardtransmit(pnd, "00 a4 04 00 07 d2 76 00 00 85 01 01 00", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00a4 0400 07 d2760000850101 00", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "Application select. Bad response !\n");
 		return(-1);
 	}
 
 	// Select ST file 0xE101
-	if(strcardtransmit(pnd, "00 a4 00 0c 02 e1 01", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00a4 000c 02 e101", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "ST System file select. Bad response !\n");
 		return(-1);
 	}
 
 	// Read
-	if(strcardtransmit(pnd, "00 b0 00 00 12", resp, &respsz) < 0) {
+	if(strcardtransmit(pnd, "00b0 0000 12", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "ST System file read. Bad response !\n");
 		return(-1);
 	}
 
@@ -349,19 +386,9 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 		return(-1);
 	}
 
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "NDEF file select. Bad response !\n");
-		return(-1);
-	}
-
 	// read NDEF size
 	if(strcardtransmit(pnd, "00b0 0000 02", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
-		return(-1);
-	}
-
-	if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-		fprintf(stderr, "NDEF file select. Bad response !\n");
 		return(-1);
 	}
 
@@ -387,11 +414,6 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 		respsz = RAPDUMAXSZ;
 		if(cardtransmit(pnd, readndefapdu, 5, resp, &respsz) < 0) {
 			fprintf(stderr, "cardtransmit error!\n");
-			return(-1);
-		}
-
-		if(respsz < 2 || resp[respsz-2] != 0x90 || resp[respsz-1] != 0x00) {
-			fprintf(stderr, "NDEF file read. Bad response !\n");
 			return(-1);
 		}
 
@@ -421,24 +443,97 @@ int st25tacheck(nfc_target *nt) {
 	return(1);
 }
 
+int listdevices() {
+	size_t device_count;
+	nfc_connstring devices[8];
 
-int main(int argc, const char *argv[])
+	// Scan readers/devices
+	device_count = nfc_list_devices(context, devices, sizeof(devices)/sizeof(*devices));
+	if(device_count <= 0) {
+		fprintf(stderr, "No NFC device found\n");
+		return(0);
+	}
+
+	printf("Available readers/devices:\n");
+	for(size_t d = 0; d < device_count; d++) {
+		printf("  %lu: ", d);
+		if(!(pnd = nfc_open (context, devices[d]))) {
+			printf("nfc_open() failed\n");
+		} else {
+			printf("%s (connstring=\"%s\")\n", nfc_device_get_name(pnd), nfc_device_get_connstring(pnd));
+			nfc_close(pnd);
+		}
+	}
+	return(device_count);
+}
+
+void printhelp(char *binname)
+{
+	printf("ST25TA reader v0.0.1\n");
+	printf("Copyright (c) 2022 - Denis Bodor\n\n");
+	printf("Usage : %s [OPTIONS]\n", binname);
+	printf(" -i              get info on tag\n");
+	printf(" -r              read NDEF from tag\n");
+	printf(" -p password     use this read password\n");
+	printf(" -P password     use this write password\n");
+	printf(" -q              be quiet, output nothing but NDEF data\n");
+	printf(" -d connstring   use this device (default: use the first available device)\n");
+	printf(" -v              verbose mode\n");
+	printf(" -h              show this help\n");
+}
+
+int main(int argc, char **argv)
 {
 	nfc_target nt;
-	st25taSF sf = { 0 };
-	st25taCC cc = { 0 };
-	uint8_t *ndef = NULL;
-	size_t ndeflen = 0;
 	const nfc_modulation mod = {
 		.nmt = NMT_ISO14443A,
 		.nbr = NBR_106
 	};
 
-	// Initialize libnfc and set the nfc_context
-	nfc_init(&context);
-	if(context == NULL) {
-		printf("Unable to init libnfc (malloc)\n");
-		exit(EXIT_FAILURE);
+	st25taSF sf = { 0 };
+	st25taCC cc = { 0 };
+	uint8_t *ndef = NULL;
+	size_t ndeflen = 0;
+
+	int retopt;
+	int opt = 0;
+	int optinfo = 0;
+	int optread = 0;
+	int optlistdev = 0;
+	char *optconnstring = NULL;
+
+	while((retopt = getopt(argc, argv, "ivhrld:")) != -1) {
+		switch (retopt) {
+			case 'i':
+				optinfo = 1;
+				opt++;
+				break;
+			case 'r':
+				optread = 1;
+				opt++;
+				break;
+			case 'l':
+				optlistdev = 1;
+				opt++;
+				break;
+			case 'd':
+				optconnstring = strdup(optarg);
+				break;
+			case 'v':
+				optverb = 1;
+				break;
+			case 'h':
+				printhelp(argv[0]);
+				return(EXIT_FAILURE);
+			default:
+				printhelp(argv[0]);
+				return(EXIT_FAILURE);
+		}
+	}
+
+	if(!opt) {
+		printhelp(argv[0]);
+		return(EXIT_FAILURE);
 	}
 
     if(signal(SIGINT, &sighandler) == SIG_ERR) {
@@ -451,12 +546,30 @@ int main(int argc, const char *argv[])
         return(EXIT_FAILURE);
     }
 
-	// Open, using the first available NFC device which can be in order of selection:
-	//   - default device specified using environment variable or
-	//   - first specified device in libnfc.conf (/etc/nfc) or
-	//   - first specified device in device-configuration directory (/etc/nfc/devices.d) or
-	//   - first auto-detected (if feature is not disabled in libnfc.conf) device
-	pnd = nfc_open(context, NULL);
+	// Initialize libnfc and set the nfc_context
+	nfc_init(&context);
+	if(context == NULL) {
+		printf("Unable to init libnfc (malloc)\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if(optlistdev) {
+		listdevices();
+		nfc_exit(context);
+		return(EXIT_SUCCESS);
+	}
+
+	if(optconnstring) {
+		// Open, using specified NFC device
+		pnd = nfc_open(context, optconnstring);
+	} else {
+		// Open, using the first available NFC device which can be in order of selection:
+		//   - default device specified using environment variable or
+		//   - first specified device in libnfc.conf (/etc/nfc) or
+		//   - first specified device in device-configuration directory (/etc/nfc/devices.d) or
+		//   - first auto-detected (if feature is not disabled in libnfc.conf) device
+		pnd = nfc_open(context, NULL);
+	}
 
 	if(pnd == NULL) {
 		fprintf(stderr, "Unable to open NFC device!\n");
@@ -486,40 +599,44 @@ int main(int argc, const char *argv[])
 		failquit();
 	}
 
-	if(st25tagetSF(pnd, &sf) != 0) {
-		fprintf(stderr, "Unable to get ST System file!\n");
-		failquit();
-	}
-	printf("\n");
-	printSF(&sf);
-
-	if(st25tagetCC(pnd, &cc) != 0) {
-		fprintf(stderr, "unable to get st system file!\n");
-		failquit();
-	}
-	printf("\n");
-	printCC(&cc);
-
-	if((ndeflen=st25tagetndef(pnd, &ndef)) < 0 ) {
-		fprintf(stderr, "Unable to read NDEF file read !\n");
-		failquit();
-	}
-
-	// display
-	printf("\nNDEF data:\n");
-	if(ndeflen > 0) {
-		for(int i=0; i < ndeflen; i++) {
-			printf("%02x ", ndef[i]);
-			if(!((i+1)%16))
-				printf("\n");
+	if(optinfo) {
+		if(st25tagetSF(pnd, &sf) != 0) {
+			fprintf(stderr, "Unable to get ST System file!\n");
+			failquit();
 		}
 		printf("\n");
-	} else {
-		printf("No NDEF data\n");
+		printSF(&sf);
+
+		if(st25tagetCC(pnd, &cc) != 0) {
+			fprintf(stderr, "unable to get CC file!\n");
+			failquit();
+		}
+		printf("\n");
+		printCC(&cc);
 	}
 
-	if(ndef)
-		free(ndef);
+	if(optread) {
+		if((ndeflen=st25tagetndef(pnd, &ndef)) < 0 ) {
+			fprintf(stderr, "Unable to read NDEF file read !\n");
+			failquit();
+		}
+
+		// display
+		printf("\nNDEF data (%zu):\n", ndeflen);
+		if(ndeflen > 0) {
+			for(int i=0; i < ndeflen; i++) {
+				printf("%02x ", ndef[i]);
+				if(!((i+1)%16))
+					printf("\n");
+			}
+			printf("\n");
+		} else {
+			printf("No NDEF data\n");
+		}
+
+		if(ndef)
+			free(ndef);
+	}
 
 	// Close NFC device
 	nfc_close(pnd);

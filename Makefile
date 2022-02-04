@@ -1,4 +1,4 @@
-TARGET  := st25ta_read
+TARGET  := st25taread
 WARN    := -Wall
 CFLAGS  := -O2 ${WARN} `pkg-config --cflags libnfc`
 LDFLAGS := `pkg-config --libs libnfc`
