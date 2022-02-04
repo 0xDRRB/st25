@@ -26,20 +26,70 @@ typedef struct st25taCC_t {
 	uint8_t vmapping;
 	uint8_t nbread[2];
 	uint8_t nbwrite[2];
+
 	uint8_t tfield;
 	uint8_t vfield;
 	uint8_t id[2];
 	uint8_t maxsize[2];
 	uint8_t readaccess;
 	uint8_t writeaccess;
+
+	uint8_t tfield1;
+	uint8_t vfield1;
+	uint8_t id1[2];
+	uint8_t maxsize1[2];
+	uint8_t readaccess1;
+	uint8_t writeaccess1;
+
+	uint8_t tfield2;
+	uint8_t vfield2;
+	uint8_t id2[2];
+	uint8_t maxsize2[2];
+	uint8_t readaccess2;
+	uint8_t writeaccess2;
+
+	uint8_t tfield3;
+	uint8_t vfield3;
+	uint8_t id3[2];
+	uint8_t maxsize3[2];
+	uint8_t readaccess3;
+	uint8_t writeaccess3;
+
+	uint8_t tfield4;
+	uint8_t vfield4;
+	uint8_t id4[2];
+	uint8_t maxsize4[2];
+	uint8_t readaccess4;
+	uint8_t writeaccess4;
+
+	uint8_t tfield5;
+	uint8_t vfield5;
+	uint8_t id5[2];
+	uint8_t maxsize5[2];
+	uint8_t readaccess5;
+	uint8_t writeaccess5;
+
+	uint8_t tfield6;
+	uint8_t vfield6;
+	uint8_t id6[2];
+	uint8_t maxsize6[2];
+	uint8_t readaccess6;
+	uint8_t writeaccess6;
+
+	uint8_t tfield7;
+	uint8_t vfield7;
+	uint8_t id7[2];
+	uint8_t maxsize7[2];
+	uint8_t readaccess7;
+	uint8_t writeaccess7;
 } st25taCC;
 
 typedef struct st25taSF_t {
 	uint8_t size[2];
-	uint8_t gpocfg;		// ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t countercfg; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t counter[3]; // ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
-	uint8_t filenum;
+	uint8_t gpocfg;			// ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t countercfg; 	// ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t counter[3]; 	// ST25TA512B, ST25TA02KB, ST25TA02KB-D, ST25TA02KB-P only
+	uint8_t ver_filenum;	// (ST25TA64K + ST25TA16K) = number of NDEF files    (ST25TA02KB-D + ST25TA02KB-P) = product version
 	uint8_t uid[7];
 	uint8_t memsize[2];
 	uint8_t product;
@@ -53,7 +103,7 @@ void failquit();
 const char *strst25tastatus(uint16_t code);
 const char *strproduct(uint8_t code);
 const char *strGPOconfig(uint8_t code);
-void printCC(st25taCC *cc);
+void printCC(st25taCC *cc, uint8_t numfile);
 void printSF(st25taSF *sf);
 int st25tagetCC(nfc_device *pnd, st25taCC *cc);
 int st25tagetSF(nfc_device *pnd, st25taSF *sf);

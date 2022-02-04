@@ -66,7 +66,7 @@ int cardtransmit(nfc_device *pnd, uint8_t *capdu, size_t capdulen, uint8_t *rapd
 		return(-1);
 	}
 
-	status = (rapdu[res-2] << 8) | rapdu[res-1];	
+	status = (rapdu[res-2] << 8) | rapdu[res-1];
 	if(status != S_SUCCESS) {
 		fprintf(stderr, "Bad response ! 0x%04x:%s\n", status, strst25tastatus(status));
 		return(-1);
@@ -157,7 +157,7 @@ int strcardtransmit(nfc_device *pnd, const char *line, uint8_t *rapdu, size_t *r
 		printf(RESET "\n");
 	}
 
-	status = (rapdu[res-2] << 8) | rapdu[res-1];	
+	status = (rapdu[res-2] << 8) | rapdu[res-1];
 	if(status != S_SUCCESS) {
 		fprintf(stderr, "Bad response ! 0x%04x:%s\n", status, strst25tastatus(status));
 		return(-1);
@@ -263,28 +263,85 @@ const char *strGPOconfig(uint8_t code) {
 	}
 }
 
-void printCC(st25taCC *cc) {
+void printCC(st25taCC *cc, uint8_t numfile) {
 	printf("Capability Container file\n");
 	printf("  Len:                      %u\n", (cc->size[0] << 8) | cc->size[1]);
 	printf("  Version:                  %s\n", cc->vmapping == 0x20 ? "v2.0" : cc->vmapping == 0x10 ? "v1.0" : "??");
 	printf("  MLe max R-APDU data size: %u\n", (cc->nbread[0] << 8) | cc->nbread[1]);
 	printf("  MLc max C-APDU data size: %u\n", (cc->nbwrite[0] << 8) | cc->nbwrite[1]);
 	printf("  NDEF file control TLV (Tag/Length/Value):\n");
-	printf("    type of file:           %02x\n", cc->tfield);
-	printf("    L field:                %02x\n", cc->vfield);
-	printf("    file id:                %02x%02x\n", cc->id[0], cc->id[1]);
+	printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id[0], cc->id[1]);
+	printf("    type of file:           %s (%02x)\n", cc->tfield==0x04 ? "NDEF" : cc->tfield==0x05 ? "" : "????", cc->tfield);
 	printf("    max ndef size:          %u\n", (cc->maxsize[0] << 8) | cc->maxsize[1]);
-	printf("    -- access rights --\n");
-	printf("    read:                   %02x (%s)\n", cc->readaccess, cc->readaccess == 0x00 ? "Unlocked" : cc->readaccess == 0x80 ? "Locked" : cc->readaccess == 0xfe ? "PerlLocked" : "?????");
-	printf("    write:                  %02x (%s)\n", cc->writeaccess, cc->writeaccess == 0x00 ? "Unlocked" : cc->writeaccess == 0x80 ? "Locked" : cc->writeaccess == 0xff ? "PerlLocked" : "?????");
+	printf("    read access:            %02x (%s)\n", cc->readaccess, cc->readaccess == 0x00 ? "Unlocked" : cc->readaccess == 0x80 ? "Locked" : cc->readaccess == 0xfe ? "PerlLocked" : "?????");
+	printf("    write access:           %02x (%s)\n", cc->writeaccess, cc->writeaccess == 0x00 ? "Unlocked" : cc->writeaccess == 0x80 ? "Locked" : cc->writeaccess == 0xff ? "PerlLocked" : "?????");
+
+	if(numfile >= 1) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id1[0], cc->id1[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield1==0x04 ? "NDEF" : cc->tfield1==0x05 ? "" : "????", cc->tfield1);
+		printf("    max ndef size:          %u\n", (cc->maxsize1[0] << 8) | cc->maxsize1[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess1, cc->readaccess1 == 0x00 ? "Unlocked" : cc->readaccess1 == 0x80 ? "Locked" : cc->readaccess1 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess1, cc->writeaccess1 == 0x00 ? "Unlocked" : cc->writeaccess1 == 0x80 ? "Locked" : cc->writeaccess1 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 2) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id2[0], cc->id2[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield2==0x04 ? "NDEF" : cc->tfield2==0x05 ? "" : "????", cc->tfield2);
+		printf("    max ndef size:          %u\n", (cc->maxsize2[0] << 8) | cc->maxsize2[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess2, cc->readaccess2 == 0x00 ? "Unlocked" : cc->readaccess2 == 0x80 ? "Locked" : cc->readaccess2 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess2, cc->writeaccess2 == 0x00 ? "Unlocked" : cc->writeaccess2 == 0x80 ? "Locked" : cc->writeaccess2 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 3) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id3[0], cc->id3[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield3==0x04 ? "NDEF" : cc->tfield3==0x05 ? "" : "????", cc->tfield3);
+		printf("    max ndef size:          %u\n", (cc->maxsize3[0] << 8) | cc->maxsize3[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess3, cc->readaccess3 == 0x00 ? "Unlocked" : cc->readaccess3 == 0x80 ? "Locked" : cc->readaccess3 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess3, cc->writeaccess3 == 0x00 ? "Unlocked" : cc->writeaccess3 == 0x80 ? "Locked" : cc->writeaccess3 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 4) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id4[0], cc->id4[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield4==0x04 ? "NDEF" : cc->tfield4==0x05 ? "" : "????", cc->tfield4);
+		printf("    max ndef size:          %u\n", (cc->maxsize4[0] << 8) | cc->maxsize4[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess4, cc->readaccess4 == 0x00 ? "Unlocked" : cc->readaccess4 == 0x80 ? "Locked" : cc->readaccess4 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess4, cc->writeaccess4 == 0x00 ? "Unlocked" : cc->writeaccess4 == 0x80 ? "Locked" : cc->writeaccess4 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 5) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id5[0], cc->id5[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield5==0x04 ? "NDEF" : cc->tfield5==0x05 ? "" : "????", cc->tfield5);
+		printf("    max ndef size:          %u\n", (cc->maxsize5[0] << 8) | cc->maxsize5[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess5, cc->readaccess5 == 0x00 ? "Unlocked" : cc->readaccess5 == 0x80 ? "Locked" : cc->readaccess5 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess5, cc->writeaccess5 == 0x00 ? "Unlocked" : cc->writeaccess5 == 0x80 ? "Locked" : cc->writeaccess5 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 6) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id6[0], cc->id6[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield6==0x04 ? "NDEF" : cc->tfield6==0x05 ? "" : "????", cc->tfield6);
+		printf("    max ndef size:          %u\n", (cc->maxsize6[0] << 8) | cc->maxsize6[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess6, cc->readaccess6 == 0x00 ? "Unlocked" : cc->readaccess6 == 0x80 ? "Locked" : cc->readaccess6 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess6, cc->writeaccess6 == 0x00 ? "Unlocked" : cc->writeaccess6 == 0x80 ? "Locked" : cc->writeaccess6 == 0xff ? "PerlLocked" : "?????");
+	}
+	if(numfile >= 7) {
+		printf("  ----\n");
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id7[0], cc->id7[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tfield7==0x04 ? "NDEF" : cc->tfield7==0x05 ? "" : "????", cc->tfield7);
+		printf("    max ndef size:          %u\n", (cc->maxsize7[0] << 8) | cc->maxsize7[1]);
+		printf("    read access:            %02x (%s)\n", cc->readaccess7, cc->readaccess7 == 0x00 ? "Unlocked" : cc->readaccess7 == 0x80 ? "Locked" : cc->readaccess7 == 0xfe ? "PerlLocked" : "?????");
+		printf("    write access:           %02x (%s)\n", cc->writeaccess7, cc->writeaccess7 == 0x00 ? "Unlocked" : cc->writeaccess7 == 0x80 ? "Locked" : cc->writeaccess7 == 0xff ? "PerlLocked" : "?????");
+	}
 }
 
 void printSF(st25taSF *sf) {
 	printf("ST System file\n");
-	printf("  Len:               %u\n", (sf->size[0] << 8) | sf->size[1]);
-	printf("  UID:               %02X%02X%02X%02X%02X%02X%02X\n", sf->uid[0], sf->uid[1], sf->uid[2], sf->uid[3], sf->uid[4], sf->uid[5], sf->uid[6]);
-	printf("  Memory Size (-1):  %u\n", (sf->memsize[0] << 8) | sf->memsize[1]);
-	printf("  Product:           %s (0x%02X)\n", strproduct(sf->product), sf->product);
+	printf("  Len:                      %u\n", (sf->size[0] << 8) | sf->size[1]);
+	printf("  UID:                      %02X%02X%02X%02X%02X%02X%02X\n", sf->uid[0], sf->uid[1], sf->uid[2], sf->uid[3], sf->uid[4], sf->uid[5], sf->uid[6]);
+	printf("  Memory Size (-1):         %u\n", (sf->memsize[0] << 8) | sf->memsize[1]);
+	printf("  Product:                  %s (0x%02X)\n", strproduct(sf->product), sf->product);
+	if(sf->product == 0xc4 || sf->product == 0xc5)
+		printf("  Number of NDEF file:      %u\n", sf->ver_filenum+1);
 
 	if(sf->product == 0xf2 || sf->product == 0xa2) {
 		printf("\nST25TA02KB-D or ST25TA02KB-P detected\n");
@@ -295,6 +352,7 @@ void printSF(st25taSF *sf) {
 int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 	uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz;
+	uint8_t readccapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
 
 	if(!cc) return(-1);
 
@@ -310,14 +368,29 @@ int st25tagetCC(nfc_device *pnd, st25taCC *cc) {
 		return(-1);
 	}
 
-	// Read
-	if(strcardtransmit(pnd, "00b0 0000 0f", resp, &respsz) < 0) {
+	// Read 2 bytes from file (size of file)
+	if(strcardtransmit(pnd, "00b0 0000 02", resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
 	}
 
-	if(respsz == 17 && resp[0] == 0 && resp[1] == 0x0f)
-		memcpy(cc, resp, 15);
+	// 2 bytes + 0x9000
+	if(respsz != 4)
+		return(-1);
+
+	// set number of bytes to read
+	// only second byte since max CC file size = 15+(8*7) with 8 areas
+	readccapdu[4] = resp[1];
+
+	// Then read the file in full
+	respsz = RAPDUMAXSZ;
+	if(cardtransmit(pnd, readccapdu, 5, resp, &respsz) < 0) {
+		fprintf(stderr, "cardtransmit error!\n");
+		return(-1);
+	}
+
+	if(respsz == readccapdu[4]+2 && resp[0] == 0 && resp[1] == readccapdu[4])
+		memcpy(cc, resp, readccapdu[4]);
 
 	return(0);
 }
@@ -612,7 +685,11 @@ int main(int argc, char **argv)
 			failquit();
 		}
 		printf("\n");
-		printCC(&cc);
+
+		if(sf.product == 0xc4 || sf.product == 0xc5)
+			printCC(&cc, sf.ver_filenum);
+		else
+			printCC(&cc, 0);
 	}
 
 	if(optread) {
