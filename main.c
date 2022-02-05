@@ -435,13 +435,14 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	return(0);
 }
 
-int st25tagetndef(nfc_device *pnd, uint8_t **data) {
+int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int havepass) {
 	int len = 0;
     uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz = RAPDUMAXSZ;
 	st25taCC tmpcc;
 	uint16_t readsz;
 	uint8_t selndefapdu[7] = { 0x00, 0xa4, 0x00, 0x0c, 0x02, 0x00, 0x00 };
+	uint8_t verifapdu[21] = { 0x00, 0x20, 0x00, 0x01, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	unsigned int bytestoread;
 	uint16_t pos;
 	uint16_t end;
@@ -455,18 +456,34 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data) {
 	readsz = (tmpcc.nbread[0] << 8) | tmpcc.nbread[1];
 
 	// check read access right
-	if(tmpcc.readaccess != 0) {
-		fprintf(stderr, "NDEF file locked!\n");
+	if(tmpcc.readaccess == 0xfe) {
+		fprintf(stderr, "NDEF file permalocked!\n");
+		return(-1);
+	}
+
+	// locked. Have password ?
+	if(tmpcc.readaccess == 0x80 && !havepass) {
+		fprintf(stderr, "NDEF file locked and no password given!\n");
 		return(-1);
 	}
 
 	// select NDEF with ID from CC
 	selndefapdu[5] = tmpcc.id[0];
 	selndefapdu[6] = tmpcc.id[1];
-
+	respsz = RAPDUMAXSZ;
 	if(cardtransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
 		return(-1);
+	}
+
+	// verify with password given
+	if(tmpcc.readaccess == 0x80) {
+		// try to unlock with password
+		memcpy(verifapdu+5, pass, 16);
+		if(cardtransmit(pnd, verifapdu, 21, resp, &respsz) < 0) {
+			fprintf(stderr, "cardtransmit error!\n");
+			return(-1);
+		}
 	}
 
 	// read NDEF size
@@ -557,13 +574,57 @@ void printhelp(char *binname)
 	printf("Usage : %s [OPTIONS]\n", binname);
 	printf(" -i              get info on tag\n");
 	printf(" -r              read data from tag\n");
-	printf(" -p password     use this read password\n"); // TODO
-	printf(" -P password     use this write password\n"); // TODO
-	printf(" -q              be quiet, output nothing but data\n"); // TODO
-	printf(" -f ID           use this file ID when reading (default: use first file ID from CC)\n"); // TODO
+	printf(" -p password     use this read password\n");
+//	printf(" -P password     use this write password\n"); // TODO
+//	printf(" -q              be quiet, output nothing but data\n"); // TODO
+//	printf(" -f ID           use this file ID when reading (default: use first file ID from CC)\n"); // TODO
 	printf(" -d connstring   use this device (default: use the first available device)\n");
 	printf(" -v              verbose mode\n");
 	printf(" -h              show this help\n");
+}
+
+int str2pass128(const char *line, uint8_t *passwd, size_t len)
+{
+	size_t passlen = 0;
+	uint32_t temp;
+	int indx = 0;
+	char buf[5] = {0};
+
+	if(strlen(line) < 32 || len != 16)
+		return(-1);
+
+	while(line[indx]) {
+		if(line[indx] == '\t' || line[indx] == ' ') {
+			indx++;
+			continue;
+		}
+
+		if(isxdigit(line[indx])) {
+			buf[strlen(buf) + 1] = 0x00;
+			buf[strlen(buf)] = line[indx];
+		} else {
+			// we have symbols other than spaces and hex
+			return(-1);
+		}
+
+		if(strlen(buf) >= 2) {
+			sscanf(buf, "%x", &temp);
+			passwd[passlen] = (uint8_t)(temp & 0xff);
+			*buf = 0;
+			passlen++;
+			if(passlen > len)
+				return(-1);
+		}
+
+		indx++;
+	}
+
+	// no partial hex bytes and need exact match
+	if(strlen(buf) > 0 || passlen != len) {
+		return(-1);
+	}
+
+	return(0);
 }
 
 int main(int argc, char **argv)
@@ -577,16 +638,19 @@ int main(int argc, char **argv)
 	st25taSF sf = { 0 };
 	st25taCC cc = { 0 };
 	uint8_t *ndef = NULL;
-	size_t ndeflen = 0;
+	int ndeflen = 0;
+	uint8_t readpass[16] = { 0 };
+//	uint8_t writepass[16] = { 0 }; // TODO
 
 	int retopt;
 	int opt = 0;
 	int optinfo = 0;
 	int optread = 0;
+	int optreadpass = 0;
 	int optlistdev = 0;
 	char *optconnstring = NULL;
 
-	while((retopt = getopt(argc, argv, "ivhrld:")) != -1) {
+	while((retopt = getopt(argc, argv, "ivhrld:p:")) != -1) {
 		switch (retopt) {
 			case 'i':
 				optinfo = 1;
@@ -602,6 +666,13 @@ int main(int argc, char **argv)
 				break;
 			case 'd':
 				optconnstring = strdup(optarg);
+				break;
+			case 'p':
+				if(str2pass128(optarg, readpass, 16) < 0) {
+					fprintf(stderr, "Invalid password! Must be 16*hex (space allowed).\n");
+					return(EXIT_FAILURE);
+				}
+				optreadpass = 1;
 				break;
 			case 'v':
 				optverb = 1;
@@ -704,13 +775,13 @@ int main(int argc, char **argv)
 	}
 
 	if(optread) {
-		if((ndeflen=st25tagetndef(pnd, &ndef)) < 0 ) {
-			fprintf(stderr, "Unable to read NDEF file read !\n");
+		if((ndeflen=st25tagetndef(pnd, &ndef, readpass, optreadpass)) < 0 ) {
+			fprintf(stderr, "Unable to read file on tag!\n");
 			failquit();
 		}
 
 		// display
-		printf("\nNDEF data (%zu):\n", ndeflen);
+		printf("\nNDEF data (%d):\n", ndeflen);
 		if(ndeflen > 0) {
 			for(int i=0; i < ndeflen; i++) {
 				printf("%02x ", ndef[i]);
