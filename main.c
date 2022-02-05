@@ -263,6 +263,16 @@ const char *strGPOconfig(uint8_t code) {
 	}
 }
 
+const char *straccessbyte(uint8_t byte) {
+	switch(byte) {
+		case 0x00: return(GREEN "Unlocked" RESET);
+		case 0x80: return(YELLOW "Locked" RESET);
+		case 0xfe: return(RED "Permalocked" RESET);
+		case 0xff: return(RED "Permalocked" RESET);
+		default: return("????");
+	}
+}
+
 void printCC(st25taCC *cc, uint8_t numfile) {
 	printf("Capability Container file\n");
 	printf("  Len:                      %u\n", (cc->size[0] << 8) | cc->size[1]);
@@ -273,64 +283,64 @@ void printCC(st25taCC *cc, uint8_t numfile) {
 	printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id[0], cc->id[1]);
 	printf("    type of file:           %s (%02x)\n", cc->tfield==0x04 ? "NDEF" : cc->tfield==0x05 ? "Proprietary" : "????", cc->tfield);
 	printf("    max ndef size:          %u\n", (cc->maxsize[0] << 8) | cc->maxsize[1]);
-	printf("    read access:            %02x (%s)\n", cc->readaccess, cc->readaccess == 0x00 ? "Unlocked" : cc->readaccess == 0x80 ? "Locked" : cc->readaccess == 0xfe ? "PerlLocked" : "?????");
-	printf("    write access:           %02x (%s)\n", cc->writeaccess, cc->writeaccess == 0x00 ? "Unlocked" : cc->writeaccess == 0x80 ? "Locked" : cc->writeaccess == 0xff ? "PerlLocked" : "?????");
+	printf("    read access:            %02x (%s)\n", cc->readaccess, straccessbyte(cc->readaccess));
+	printf("    write access:           %02x (%s)\n", cc->writeaccess, straccessbyte(cc->writeaccess));
 
 	if(numfile >= 1) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id1[0], cc->id1[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield1==0x04 ? "NDEF" : cc->tfield1==0x05 ? "Proprietary" : "????", cc->tfield1);
 		printf("    max ndef size:          %u\n", (cc->maxsize1[0] << 8) | cc->maxsize1[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess1, cc->readaccess1 == 0x00 ? "Unlocked" : cc->readaccess1 == 0x80 ? "Locked" : cc->readaccess1 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess1, cc->writeaccess1 == 0x00 ? "Unlocked" : cc->writeaccess1 == 0x80 ? "Locked" : cc->writeaccess1 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess1, straccessbyte(cc->readaccess1));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess1, straccessbyte(cc->writeaccess1));
 	}
 	if(numfile >= 2) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id2[0], cc->id2[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield2==0x04 ? "NDEF" : cc->tfield2==0x05 ? "Proprietary" : "????", cc->tfield2);
 		printf("    max ndef size:          %u\n", (cc->maxsize2[0] << 8) | cc->maxsize2[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess2, cc->readaccess2 == 0x00 ? "Unlocked" : cc->readaccess2 == 0x80 ? "Locked" : cc->readaccess2 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess2, cc->writeaccess2 == 0x00 ? "Unlocked" : cc->writeaccess2 == 0x80 ? "Locked" : cc->writeaccess2 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess2, straccessbyte(cc->readaccess2));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess2, straccessbyte(cc->writeaccess2));
 	}
 	if(numfile >= 3) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id3[0], cc->id3[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield3==0x04 ? "NDEF" : cc->tfield3==0x05 ? "Proprietary" : "????", cc->tfield3);
 		printf("    max ndef size:          %u\n", (cc->maxsize3[0] << 8) | cc->maxsize3[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess3, cc->readaccess3 == 0x00 ? "Unlocked" : cc->readaccess3 == 0x80 ? "Locked" : cc->readaccess3 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess3, cc->writeaccess3 == 0x00 ? "Unlocked" : cc->writeaccess3 == 0x80 ? "Locked" : cc->writeaccess3 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess3, straccessbyte(cc->readaccess3));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess3, straccessbyte(cc->writeaccess3));
 	}
 	if(numfile >= 4) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id4[0], cc->id4[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield4==0x04 ? "NDEF" : cc->tfield4==0x05 ? "Proprietary" : "????", cc->tfield4);
 		printf("    max ndef size:          %u\n", (cc->maxsize4[0] << 8) | cc->maxsize4[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess4, cc->readaccess4 == 0x00 ? "Unlocked" : cc->readaccess4 == 0x80 ? "Locked" : cc->readaccess4 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess4, cc->writeaccess4 == 0x00 ? "Unlocked" : cc->writeaccess4 == 0x80 ? "Locked" : cc->writeaccess4 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess4, straccessbyte(cc->readaccess4));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess4, straccessbyte(cc->writeaccess4));
 	}
 	if(numfile >= 5) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id5[0], cc->id5[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield5==0x04 ? "NDEF" : cc->tfield5==0x05 ? "Proprietary" : "????", cc->tfield5);
 		printf("    max ndef size:          %u\n", (cc->maxsize5[0] << 8) | cc->maxsize5[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess5, cc->readaccess5 == 0x00 ? "Unlocked" : cc->readaccess5 == 0x80 ? "Locked" : cc->readaccess5 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess5, cc->writeaccess5 == 0x00 ? "Unlocked" : cc->writeaccess5 == 0x80 ? "Locked" : cc->writeaccess5 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess5, straccessbyte(cc->readaccess5));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess5, straccessbyte(cc->writeaccess5));
 	}
 	if(numfile >= 6) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id6[0], cc->id6[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield6==0x04 ? "NDEF" : cc->tfield6==0x05 ? "Proprietary" : "????", cc->tfield6);
 		printf("    max ndef size:          %u\n", (cc->maxsize6[0] << 8) | cc->maxsize6[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess6, cc->readaccess6 == 0x00 ? "Unlocked" : cc->readaccess6 == 0x80 ? "Locked" : cc->readaccess6 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess6, cc->writeaccess6 == 0x00 ? "Unlocked" : cc->writeaccess6 == 0x80 ? "Locked" : cc->writeaccess6 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess6, straccessbyte(cc->readaccess6));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess6, straccessbyte(cc->writeaccess6));
 	}
 	if(numfile >= 7) {
 		printf("  ----\n");
 		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id7[0], cc->id7[1]);
 		printf("    type of file:           %s (%02x)\n", cc->tfield7==0x04 ? "NDEF" : cc->tfield7==0x05 ? "Proprietary" : "????", cc->tfield7);
 		printf("    max ndef size:          %u\n", (cc->maxsize7[0] << 8) | cc->maxsize7[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess7, cc->readaccess7 == 0x00 ? "Unlocked" : cc->readaccess7 == 0x80 ? "Locked" : cc->readaccess7 == 0xfe ? "PerlLocked" : "?????");
-		printf("    write access:           %02x (%s)\n", cc->writeaccess7, cc->writeaccess7 == 0x00 ? "Unlocked" : cc->writeaccess7 == 0x80 ? "Locked" : cc->writeaccess7 == 0xff ? "PerlLocked" : "?????");
+		printf("    read access:            %02x (%s)\n", cc->readaccess7, straccessbyte(cc->readaccess7));
+		printf("    write access:           %02x (%s)\n", cc->writeaccess7, straccessbyte(cc->writeaccess7));
 	}
 }
 
