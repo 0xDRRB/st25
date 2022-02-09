@@ -435,7 +435,7 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	return(0);
 }
 
-int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int havepass) {
+int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	int len = 0;
     uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz = RAPDUMAXSZ;
@@ -462,7 +462,7 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int havepass) 
 	}
 
 	// locked. Have password ?
-	if(tmpcc.readaccess == 0x80 && !havepass) {
+	if(tmpcc.readaccess == 0x80 && !pass) {
 		fprintf(stderr, "NDEF file locked and no password given!\n");
 		return(-1);
 	}
@@ -639,6 +639,7 @@ int main(int argc, char **argv)
 	uint8_t *ndef = NULL;
 	int ndeflen = 0;
 	uint8_t readpass[16] = { 0 };
+	uint8_t *preadpass = NULL;
 //	uint8_t writepass[16] = { 0 }; // TODO
 
 	int retopt;
@@ -774,7 +775,9 @@ int main(int argc, char **argv)
 	}
 
 	if(optread) {
-		if((ndeflen=st25tagetndef(pnd, &ndef, readpass, optreadpass)) < 0 ) {
+		if(optreadpass)
+			preadpass = readpass;
+		if((ndeflen=st25tagetndef(pnd, &ndef, preadpass)) < 0 ) {
 			fprintf(stderr, "Unable to read file on tag!\n");
 			failquit();
 		}
