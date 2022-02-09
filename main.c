@@ -574,7 +574,7 @@ void printhelp(char *binname)
 	printf("Usage : %s [OPTIONS]\n", binname);
 	printf(" -i              get info on tag\n");
 	printf(" -r              read data from tag\n");
-	printf(" -p password     use this read password\n");
+	printf(" -p password     use this read password (space allowed)\n");
 //	printf(" -P password     use this write password\n"); // TODO
 //	printf(" -q              be quiet, output nothing but data\n"); // TODO
 //	printf(" -f ID           use this file ID when reading (default: use first file ID from CC)\n"); // TODO
@@ -583,14 +583,14 @@ void printhelp(char *binname)
 	printf(" -h              show this help\n");
 }
 
-int str2pass128(const char *line, uint8_t *passwd, size_t len)
+int hex2array(const char *line, uint8_t *passwd, size_t len)
 {
 	size_t passlen = 0;
 	uint32_t temp;
 	int indx = 0;
 	char buf[5] = {0};
 
-	if(strlen(line) < 32 || len != 16)
+	if(strlen(line) < len*2)
 		return(-1);
 
 	while(line[indx]) {
@@ -620,9 +620,8 @@ int str2pass128(const char *line, uint8_t *passwd, size_t len)
 	}
 
 	// no partial hex bytes and need exact match
-	if(strlen(buf) > 0 || passlen != len) {
+	if(strlen(buf) > 0 || passlen != len)
 		return(-1);
-	}
 
 	return(0);
 }
@@ -668,7 +667,7 @@ int main(int argc, char **argv)
 				optconnstring = strdup(optarg);
 				break;
 			case 'p':
-				if(str2pass128(optarg, readpass, 16) < 0) {
+				if(hex2array(optarg, readpass, 16) < 0) {
 					fprintf(stderr, "Invalid password! Must be 16*hex (space allowed).\n");
 					return(EXIT_FAILURE);
 				}

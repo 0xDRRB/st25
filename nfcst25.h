@@ -111,5 +111,5 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int havepass);
 int st25tacheck(nfc_target *nt);
 int listdevices();
 void printhelp(char *binname);
-int str2pass128(const char *line, uint8_t *passwd, size_t len);
+int hex2array(const char *line, uint8_t *passwd, size_t len);
 
