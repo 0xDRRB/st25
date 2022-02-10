@@ -280,67 +280,19 @@ void printCC(st25taCC *cc, uint8_t numfile) {
 	printf("  MLe max R-APDU data size: %u\n", (cc->nbread[0] << 8) | cc->nbread[1]);
 	printf("  MLc max C-APDU data size: %u\n", (cc->nbwrite[0] << 8) | cc->nbwrite[1]);
 	printf("  NDEF file control TLV (Tag/Length/Value):\n");
-	printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id[0], cc->id[1]);
-	printf("    type of file:           %s (%02x)\n", cc->tfield==0x04 ? "NDEF" : cc->tfield==0x05 ? "Proprietary" : "????", cc->tfield);
-	printf("    max ndef size:          %u\n", (cc->maxsize[0] << 8) | cc->maxsize[1]);
-	printf("    read access:            %02x (%s)\n", cc->readaccess, straccessbyte(cc->readaccess));
-	printf("    write access:           %02x (%s)\n", cc->writeaccess, straccessbyte(cc->writeaccess));
+	printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->tlv[0].id[0], cc->tlv[0].id[1]);
+	printf("    type of file:           %s (%02x)\n", cc->tlv[0].tfield==0x04 ? "NDEF" : cc->tlv[0].tfield==0x05 ? "Proprietary" : "????", cc->tlv[0].tfield);
+	printf("    max ndef size:          %u\n", (cc->tlv[0].maxsize[0] << 8) | cc->tlv[0].maxsize[1]);
+	printf("    read access:            %02x (%s)\n", cc->tlv[0].readaccess, straccessbyte(cc->tlv[0].readaccess));
+	printf("    write access:           %02x (%s)\n", cc->tlv[0].writeaccess, straccessbyte(cc->tlv[0].writeaccess));
 
-	if(numfile >= 1) {
+	for(int i=1; i<=numfile; i++) {
 		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id1[0], cc->id1[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield1==0x04 ? "NDEF" : cc->tfield1==0x05 ? "Proprietary" : "????", cc->tfield1);
-		printf("    max ndef size:          %u\n", (cc->maxsize1[0] << 8) | cc->maxsize1[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess1, straccessbyte(cc->readaccess1));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess1, straccessbyte(cc->writeaccess1));
-	}
-	if(numfile >= 2) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id2[0], cc->id2[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield2==0x04 ? "NDEF" : cc->tfield2==0x05 ? "Proprietary" : "????", cc->tfield2);
-		printf("    max ndef size:          %u\n", (cc->maxsize2[0] << 8) | cc->maxsize2[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess2, straccessbyte(cc->readaccess2));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess2, straccessbyte(cc->writeaccess2));
-	}
-	if(numfile >= 3) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id3[0], cc->id3[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield3==0x04 ? "NDEF" : cc->tfield3==0x05 ? "Proprietary" : "????", cc->tfield3);
-		printf("    max ndef size:          %u\n", (cc->maxsize3[0] << 8) | cc->maxsize3[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess3, straccessbyte(cc->readaccess3));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess3, straccessbyte(cc->writeaccess3));
-	}
-	if(numfile >= 4) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id4[0], cc->id4[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield4==0x04 ? "NDEF" : cc->tfield4==0x05 ? "Proprietary" : "????", cc->tfield4);
-		printf("    max ndef size:          %u\n", (cc->maxsize4[0] << 8) | cc->maxsize4[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess4, straccessbyte(cc->readaccess4));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess4, straccessbyte(cc->writeaccess4));
-	}
-	if(numfile >= 5) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id5[0], cc->id5[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield5==0x04 ? "NDEF" : cc->tfield5==0x05 ? "Proprietary" : "????", cc->tfield5);
-		printf("    max ndef size:          %u\n", (cc->maxsize5[0] << 8) | cc->maxsize5[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess5, straccessbyte(cc->readaccess5));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess5, straccessbyte(cc->writeaccess5));
-	}
-	if(numfile >= 6) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id6[0], cc->id6[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield6==0x04 ? "NDEF" : cc->tfield6==0x05 ? "Proprietary" : "????", cc->tfield6);
-		printf("    max ndef size:          %u\n", (cc->maxsize6[0] << 8) | cc->maxsize6[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess6, straccessbyte(cc->readaccess6));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess6, straccessbyte(cc->writeaccess6));
-	}
-	if(numfile >= 7) {
-		printf("  ----\n");
-		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->id7[0], cc->id7[1]);
-		printf("    type of file:           %s (%02x)\n", cc->tfield7==0x04 ? "NDEF" : cc->tfield7==0x05 ? "Proprietary" : "????", cc->tfield7);
-		printf("    max ndef size:          %u\n", (cc->maxsize7[0] << 8) | cc->maxsize7[1]);
-		printf("    read access:            %02x (%s)\n", cc->readaccess7, straccessbyte(cc->readaccess7));
-		printf("    write access:           %02x (%s)\n", cc->writeaccess7, straccessbyte(cc->writeaccess7));
+		printf(CYAN "    file id:                %02x%02x" RESET "\n", cc->tlv[i].id[0], cc->tlv[i].id[1]);
+		printf("    type of file:           %s (%02x)\n", cc->tlv[i].tfield==0x04 ? "NDEF" : cc->tlv[i].tfield==0x05 ? "Proprietary" : "????", cc->tlv[i].tfield);
+		printf("    max ndef size:          %u\n", (cc->tlv[i].maxsize[0] << 8) | cc->tlv[i].maxsize[1]);
+		printf("    read access:            %02x (%s)\n", cc->tlv[i].readaccess, straccessbyte(cc->tlv[i].readaccess));
+		printf("    write access:           %02x (%s)\n", cc->tlv[i].writeaccess, straccessbyte(cc->tlv[i].writeaccess));
 	}
 }
 
@@ -456,20 +408,20 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	readsz = (tmpcc.nbread[0] << 8) | tmpcc.nbread[1];
 
 	// check read access right
-	if(tmpcc.readaccess == 0xfe) {
+	if(tmpcc.tlv[0].readaccess == 0xfe) {
 		fprintf(stderr, "NDEF file permalocked!\n");
 		return(-1);
 	}
 
 	// locked. Have password ?
-	if(tmpcc.readaccess == 0x80 && !pass) {
+	if(tmpcc.tlv[0].readaccess == 0x80 && !pass) {
 		fprintf(stderr, "NDEF file locked and no password given!\n");
 		return(-1);
 	}
 
 	// select NDEF with ID from CC
-	selndefapdu[5] = tmpcc.id[0];
-	selndefapdu[6] = tmpcc.id[1];
+	selndefapdu[5] = tmpcc.tlv[0].id[0];
+	selndefapdu[6] = tmpcc.tlv[0].id[1];
 	respsz = RAPDUMAXSZ;
 	if(cardtransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
@@ -477,7 +429,7 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	}
 
 	// verify with password given
-	if(tmpcc.readaccess == 0x80) {
+	if(tmpcc.tlv[0].readaccess == 0x80) {
 		// try to unlock with password
 		memcpy(verifapdu+5, pass, 16);
 		if(cardtransmit(pnd, verifapdu, 21, resp, &respsz) < 0) {

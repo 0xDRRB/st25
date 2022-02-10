@@ -21,67 +21,21 @@
 #define E_NOINS			0x6d00	// INS field not supported
 #define E_CLASS			0x6e00	// Class not supported
 
-typedef struct st25taCC_t {
-	uint8_t size[2];
-	uint8_t vmapping;
-	uint8_t nbread[2];
-	uint8_t nbwrite[2];
-
+typedef struct st25tlv_t {
 	uint8_t tfield;
 	uint8_t vfield;
 	uint8_t id[2];
 	uint8_t maxsize[2];
 	uint8_t readaccess;
 	uint8_t writeaccess;
+} st25tlv;
 
-	uint8_t tfield1;
-	uint8_t vfield1;
-	uint8_t id1[2];
-	uint8_t maxsize1[2];
-	uint8_t readaccess1;
-	uint8_t writeaccess1;
-
-	uint8_t tfield2;
-	uint8_t vfield2;
-	uint8_t id2[2];
-	uint8_t maxsize2[2];
-	uint8_t readaccess2;
-	uint8_t writeaccess2;
-
-	uint8_t tfield3;
-	uint8_t vfield3;
-	uint8_t id3[2];
-	uint8_t maxsize3[2];
-	uint8_t readaccess3;
-	uint8_t writeaccess3;
-
-	uint8_t tfield4;
-	uint8_t vfield4;
-	uint8_t id4[2];
-	uint8_t maxsize4[2];
-	uint8_t readaccess4;
-	uint8_t writeaccess4;
-
-	uint8_t tfield5;
-	uint8_t vfield5;
-	uint8_t id5[2];
-	uint8_t maxsize5[2];
-	uint8_t readaccess5;
-	uint8_t writeaccess5;
-
-	uint8_t tfield6;
-	uint8_t vfield6;
-	uint8_t id6[2];
-	uint8_t maxsize6[2];
-	uint8_t readaccess6;
-	uint8_t writeaccess6;
-
-	uint8_t tfield7;
-	uint8_t vfield7;
-	uint8_t id7[2];
-	uint8_t maxsize7[2];
-	uint8_t readaccess7;
-	uint8_t writeaccess7;
+typedef struct st25taCC_t {
+	uint8_t size[2];
+	uint8_t vmapping;
+	uint8_t nbread[2];
+	uint8_t nbwrite[2];
+	st25tlv tlv[8];
 } st25taCC;
 
 typedef struct st25taSF_t {
