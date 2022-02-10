@@ -61,7 +61,7 @@ void printCC(st25taCC *cc, uint8_t numfile);
 void printSF(st25taSF *sf);
 int st25tagetCC(nfc_device *pnd, st25taCC *cc);
 int st25tagetSF(nfc_device *pnd, st25taSF *sf);
-int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass);
+int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int n);
 int st25tacheck(nfc_target *nt);
 int listdevices();
 void printhelp(char *binname);

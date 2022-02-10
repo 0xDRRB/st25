@@ -387,11 +387,12 @@ int st25tagetSF(nfc_device *pnd, st25taSF *sf) {
 	return(0);
 }
 
-int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
+int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int n) {
 	int len = 0;
     uint8_t resp[RAPDUMAXSZ] = {0};
 	size_t respsz = RAPDUMAXSZ;
 	st25taCC tmpcc;
+	st25taSF tmpsf;
 	uint16_t readsz;
 	uint8_t selndefapdu[7] = { 0x00, 0xa4, 0x00, 0x0c, 0x02, 0x00, 0x00 };
 	uint8_t verifapdu[21] = { 0x00, 0x20, 0x00, 0x01, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
@@ -401,6 +402,21 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	uint8_t readndefapdu[5] = { 0x00, 0xb0, 0x00, 0x00, 0x00 };
 	uint8_t *p;
 
+	if(n) {
+		if(st25tagetSF(pnd, &tmpsf) != 0)
+			return(-1);
+
+		if(n+1 > tmpsf.ver_filenum+1) {
+			fprintf(stderr, "Error: No such file on tag! (max file number is %u).\n", tmpsf.ver_filenum);
+			return(-1);
+		}
+
+		if(tmpsf.product != 0xc4 && tmpsf.product != 0xc5 && n > 0) {
+			fprintf(stderr, "Error: File selection is only available for ST25TA64K & ST25TA16K! (this is %s).\n", strproduct(tmpsf.product));
+			return(-1);
+		}
+	}
+
 	if(st25tagetCC(pnd, &tmpcc) != 0)
 		return(-1);
 
@@ -408,20 +424,20 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	readsz = (tmpcc.nbread[0] << 8) | tmpcc.nbread[1];
 
 	// check read access right
-	if(tmpcc.tlv[0].readaccess == 0xfe) {
+	if(tmpcc.tlv[n].readaccess == 0xfe) {
 		fprintf(stderr, "NDEF file permalocked!\n");
 		return(-1);
 	}
 
 	// locked. Have password ?
-	if(tmpcc.tlv[0].readaccess == 0x80 && !pass) {
+	if(tmpcc.tlv[n].readaccess == 0x80 && !pass) {
 		fprintf(stderr, "NDEF file locked and no password given!\n");
 		return(-1);
 	}
 
 	// select NDEF with ID from CC
-	selndefapdu[5] = tmpcc.tlv[0].id[0];
-	selndefapdu[6] = tmpcc.tlv[0].id[1];
+	selndefapdu[5] = tmpcc.tlv[n].id[0];
+	selndefapdu[6] = tmpcc.tlv[n].id[1];
 	respsz = RAPDUMAXSZ;
 	if(cardtransmit(pnd, selndefapdu, 7, resp, &respsz) < 0) {
 		fprintf(stderr, "cardtransmit error!\n");
@@ -429,7 +445,7 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass) {
 	}
 
 	// verify with password given
-	if(tmpcc.tlv[0].readaccess == 0x80) {
+	if(tmpcc.tlv[n].readaccess == 0x80) {
 		// try to unlock with password
 		memcpy(verifapdu+5, pass, 16);
 		if(cardtransmit(pnd, verifapdu, 21, resp, &respsz) < 0) {
@@ -529,7 +545,7 @@ void printhelp(char *binname)
 	printf(" -p password     use this read password (space allowed)\n");
 //	printf(" -P password     use this write password\n"); // TODO
 //	printf(" -q              be quiet, output nothing but data\n"); // TODO
-//	printf(" -f ID           use this file ID when reading (default: use first file ID from CC)\n"); // TODO
+	printf(" -f n            use nth file from CC when reading (default: use first file)\n"); // TODO
 	printf(" -d connstring   use this device (default: use the first available device)\n");
 	printf(" -v              verbose mode\n");
 	printf(" -h              show this help\n");
@@ -595,14 +611,16 @@ int main(int argc, char **argv)
 //	uint8_t writepass[16] = { 0 }; // TODO
 
 	int retopt;
+	char *endptr;
 	int opt = 0;
 	int optinfo = 0;
 	int optread = 0;
 	int optreadpass = 0;
 	int optlistdev = 0;
 	char *optconnstring = NULL;
+	int optfilenum = 0;
 
-	while((retopt = getopt(argc, argv, "ivhrld:p:")) != -1) {
+	while((retopt = getopt(argc, argv, "ivhrld:p:f:")) != -1) {
 		switch (retopt) {
 			case 'i':
 				optinfo = 1;
@@ -625,6 +643,13 @@ int main(int argc, char **argv)
 					return(EXIT_FAILURE);
 				}
 				optreadpass = 1;
+				break;
+			case 'f':
+				optfilenum = (int)strtol(optarg, &endptr, 10);
+				if(endptr == optarg || optfilenum < 0 || optfilenum > 7) {
+					fprintf(stderr, "You must specify a valid number (between 0 to 7)\n");
+					return(EXIT_FAILURE);
+				}
 				break;
 			case 'v':
 				optverb = 1;
@@ -729,7 +754,7 @@ int main(int argc, char **argv)
 	if(optread) {
 		if(optreadpass)
 			preadpass = readpass;
-		if((ndeflen=st25tagetndef(pnd, &ndef, preadpass)) < 0 ) {
+		if((ndeflen=st25tagetndef(pnd, &ndef, preadpass, optfilenum)) < 0 ) {
 			fprintf(stderr, "Unable to read file on tag!\n");
 			failquit();
 		}
