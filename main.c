@@ -425,13 +425,13 @@ int st25tagetndef(nfc_device *pnd, uint8_t **data, uint8_t *pass, int n) {
 
 	// check read access right
 	if(tmpcc.tlv[n].readaccess == 0xfe) {
-		fprintf(stderr, "NDEF file permalocked!\n");
+		fprintf(stderr, "Error: file permalocked!\n");
 		return(-1);
 	}
 
 	// locked. Have password ?
 	if(tmpcc.tlv[n].readaccess == 0x80 && !pass) {
-		fprintf(stderr, "NDEF file locked and no password given!\n");
+		fprintf(stderr, "Error: file locked and no password given!\n");
 		return(-1);
 	}
 
@@ -518,7 +518,7 @@ int listdevices() {
 	// Scan readers/devices
 	device_count = nfc_list_devices(context, devices, sizeof(devices)/sizeof(*devices));
 	if(device_count <= 0) {
-		fprintf(stderr, "No NFC device found\n");
+		fprintf(stderr, "Error: No NFC device found\n");
 		return(0);
 	}
 
@@ -639,7 +639,7 @@ int main(int argc, char **argv)
 				break;
 			case 'p':
 				if(hex2array(optarg, readpass, 16) < 0) {
-					fprintf(stderr, "Invalid password! Must be 16*hex (space allowed).\n");
+					fprintf(stderr, "Error: Invalid password! Must be 16*hex (space allowed).\n");
 					return(EXIT_FAILURE);
 				}
 				optreadpass = 1;
@@ -647,7 +647,7 @@ int main(int argc, char **argv)
 			case 'f':
 				optfilenum = (int)strtol(optarg, &endptr, 10);
 				if(endptr == optarg || optfilenum < 0 || optfilenum > 7) {
-					fprintf(stderr, "You must specify a valid number (between 0 to 7)\n");
+					fprintf(stderr, "Error: Invalid file number (valid range is 0 to 7)\n");
 					return(EXIT_FAILURE);
 				}
 				break;
@@ -669,19 +669,19 @@ int main(int argc, char **argv)
 	}
 
     if(signal(SIGINT, &sighandler) == SIG_ERR) {
-        printf("Can't catch SIGINT\n");
+        printf("Error: Can't catch SIGINT\n");
         return(EXIT_FAILURE);
     }
 
     if(signal(SIGTERM, &sighandler) == SIG_ERR) {
-        printf("Can't catch SIGTERM\n");
+        printf("Error: Can't catch SIGTERM\n");
         return(EXIT_FAILURE);
     }
 
 	// Initialize libnfc and set the nfc_context
 	nfc_init(&context);
 	if(context == NULL) {
-		printf("Unable to init libnfc (malloc)\n");
+		printf("Error: Unable to init libnfc (malloc)\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -704,7 +704,7 @@ int main(int argc, char **argv)
 	}
 
 	if(pnd == NULL) {
-		fprintf(stderr, "Unable to open NFC device!\n");
+		fprintf(stderr, "Error: Unable to open NFC device!\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -722,25 +722,25 @@ int main(int argc, char **argv)
 		print_hex(nt.nti.nai.abtUid, nt.nti.nai.szUidLen);
 		printf(RESET "\n");
 	} else {
-		fprintf(stderr, "No ISO14443A tag found!\n");
+		fprintf(stderr, "Error: No ISO14443A tag found!\n");
 		failquit();
 	}
 
 	if(st25tacheck(&nt) == 0) {
-		fprintf(stderr, "Not a ST25TA* tag !\n");
+		fprintf(stderr, "Error: Not a ST25TA* tag !\n");
 		failquit();
 	}
 
 	if(optinfo) {
 		if(st25tagetSF(pnd, &sf) != 0) {
-			fprintf(stderr, "Unable to get ST System file!\n");
+			fprintf(stderr, "Error: Unable to get ST System file!\n");
 			failquit();
 		}
 		printf("\n");
 		printSF(&sf);
 
 		if(st25tagetCC(pnd, &cc) != 0) {
-			fprintf(stderr, "unable to get CC file!\n");
+			fprintf(stderr, "Error: unable to get CC file!\n");
 			failquit();
 		}
 		printf("\n");
@@ -755,7 +755,7 @@ int main(int argc, char **argv)
 		if(optreadpass)
 			preadpass = readpass;
 		if((ndeflen=st25tagetndef(pnd, &ndef, preadpass, optfilenum)) < 0 ) {
-			fprintf(stderr, "Unable to read file on tag!\n");
+			fprintf(stderr, "Error: Unable to read file on tag!\n");
 			failquit();
 		}
 
