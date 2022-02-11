@@ -22,7 +22,6 @@ int optverb = 0;
 // https://www.st.com/resource/en/datasheet/st25ta64k.pdf
 // https://www.eftlab.com/knowledge-base/complete-list-of-apdu-responses/
 
-// gestionnaire de signal
 static void sighandler(int sig)
 {
     printf("Caught signal %d\n", sig);
@@ -546,6 +545,7 @@ void printhelp(char *binname)
 //	printf(" -P password     use this write password\n"); // TODO
 //	printf(" -q              be quiet, output nothing but data\n"); // TODO
 	printf(" -f n            use nth file from CC when reading (default: use first file)\n"); // TODO
+	printf(" -l              list available readers\n");
 	printf(" -d connstring   use this device (default: use the first available device)\n");
 	printf(" -v              verbose mode\n");
 	printf(" -h              show this help\n");
@@ -780,5 +780,5 @@ int main(int argc, char **argv)
 	nfc_close(pnd);
 	// Release the context
 	nfc_exit(context);
-	exit(EXIT_SUCCESS);
+	return(EXIT_SUCCESS);
 }
