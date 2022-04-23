@@ -1,5 +1,4 @@
 #pragma once
-#include <ctype.h>
 
 #define S_SUCCESS		0x9000	// Command completed successfully
 #define E_OVERFLOW_E	0x6280	// File overflow (Le error)
