@@ -13,7 +13,7 @@ all: ${TARGET}
 	${CC} ${WARN} -c ${CFLAGS}  $< -o $@
 
 ${TARGET}: ${OBJ_FILES}
-	${CC} ${WARN} ${LDFLAGS} -o $@  $(OBJ_FILES)
+	${CC} ${WARN} -o $@  $(OBJ_FILES) ${LDFLAGS}
 
 clean:
 	rm -rf *.o ${TARGET}
